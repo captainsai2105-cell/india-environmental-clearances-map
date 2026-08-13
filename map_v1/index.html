@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PARIVESH 2.0 — Granted Environmental Clearances</title>
+<style>
+  :root{
+    --bg:#eef1ee; --panel:#ffffff; --ink:#12211b; --muted:#5d6b64;
+    --line:#e3dddd; --accent:#b3261e; --accent-soft:#fbe6e3;
+    --ec:#2563eb; --fc:#159a5b; --crz:#ea580c;
+    --shadow:0 1px 3px rgba(20,40,30,.08),0 8px 24px rgba(20,40,30,.06);
+    --radius:12px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg);overflow:hidden}
+  .app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+
+  header{display:flex;align-items:center;gap:18px;padding:12px 20px;background:var(--panel);
+    border-bottom:1px solid var(--line);box-shadow:var(--shadow);z-index:5}
+  .brand{display:flex;flex-direction:column;line-height:1.15}
+  .brand b{font-size:16px;letter-spacing:.2px}
+  .brand span{font-size:11.5px;color:var(--muted)}
+  .kpis{margin-left:auto;display:flex;gap:22px;align-items:center}
+  .kpi{text-align:right}
+  .kpi .n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
+  .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+
+  .body{display:grid;grid-template-columns:296px 1fr;min-height:0}
+  aside{background:var(--panel);border-right:1px solid var(--line);padding:18px 18px 14px;
+    overflow:auto;display:flex;flex-direction:column;gap:20px}
+  .group h3{margin:0 0 9px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+
+  .seg{display:flex;background:var(--accent-soft);border-radius:10px;padding:3px;gap:2px}
+  .seg button{flex:1;border:0;background:transparent;padding:7px 4px;font-size:12.5px;font-weight:600;
+    color:var(--muted);border-radius:8px;cursor:pointer;transition:.12s}
+  .seg button:hover{color:var(--ink)}
+  .seg button[aria-pressed="true"]{background:#fff;color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .years{display:grid;grid-template-columns:repeat(5,1fr)}
+
+  input[type=search]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+    font-size:13px;background:#fff;color:var(--ink)}
+  input[type=search]:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .hint{font-size:11px;color:var(--muted);margin-top:6px}
+
+  .resetbtn{display:none;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;
+    padding:9px 12px;border-radius:9px;font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;width:100%}
+  .resetbtn:hover{background:var(--accent-soft)}
+  .resetbtn.show{display:flex}
+
+  .legend .row{display:flex;align-items:center;gap:8px;font-size:12px;margin:5px 0;color:var(--muted)}
+  .swatch{width:16px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.06)}
+  .dot{width:11px;height:11px;border-radius:50%;flex:none}
+
+  footer{margin-top:auto;font-size:10.5px;color:var(--muted);line-height:1.5}
+  footer a{color:var(--accent);text-decoration:none}
+
+  .mapwrap{position:relative;min-width:0;overflow:hidden;cursor:grab}
+  .mapwrap.dragging{cursor:grabbing}
+  #map{position:absolute;inset:0;width:100%;height:100%;display:block}
+  #pts{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .state{stroke:#ffffff;stroke-width:.8;cursor:pointer;vector-effect:non-scaling-stroke;transition:fill .3s}
+  .state:hover{stroke:#12211b;stroke-width:1.4}
+  .mk-dot{stroke:var(--accent);stroke-width:1.8;cursor:pointer}
+  .mk-dot:hover{stroke-width:2.8}
+  .statelabel{font-size:10px;fill:#14261e;pointer-events:none;text-anchor:middle;
+    paint-order:stroke;stroke:#fff;stroke-width:2.4px;font-weight:600;font-variant-numeric:tabular-nums}
+
+  .tip{position:absolute;pointer-events:none;z-index:20;background:#10231b;color:#eafff5;
+    padding:9px 11px;border-radius:9px;font-size:12px;line-height:1.45;max-width:300px;
+    box-shadow:0 6px 22px rgba(0,0,0,.28);opacity:0;transform:translateY(3px);transition:opacity .1s}
+  .tip.show{opacity:1;transform:none}
+  .tip .t{font-weight:700;margin-bottom:3px;font-size:12.5px}
+  .tip .k{color:#9fd8c2}
+  .tip .badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;color:#fff;margin-bottom:5px}
+
+  .mtitle{position:absolute;top:14px;left:16px;z-index:6;background:rgba(255,255,255,.9);
+    backdrop-filter:blur(4px);border:1px solid var(--line);border-radius:10px;padding:8px 13px;box-shadow:var(--shadow)}
+  .mtitle b{font-size:15px}.mtitle span{font-size:12px;color:var(--muted)}
+  .maplegend{position:absolute;bottom:14px;left:16px;z-index:6;background:rgba(255,255,255,.92);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:var(--shadow);font-size:11px}
+  .maplegend .ttl{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px}
+  .ramp{display:flex}.ramp i{width:26px;height:11px;display:block}
+  .ramp .lab{font-variant-numeric:tabular-nums;color:var(--muted);margin:0 4px}
+
+  .zoomctl{position:absolute;top:14px;right:16px;z-index:7;display:flex;flex-direction:column;gap:6px}
+  .zoomctl button{width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:9px;
+    font-size:18px;font-weight:600;color:var(--ink);cursor:pointer;box-shadow:var(--shadow);line-height:1}
+  .zoomctl button:hover{background:var(--accent-soft);color:var(--accent)}
+  .scrollhint{position:absolute;bottom:14px;right:16px;z-index:6;font-size:11px;color:var(--muted);
+    background:rgba(255,255,255,.85);border:1px solid var(--line);border-radius:8px;padding:5px 9px}
+
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(238,241,238,.75);z-index:30;font-size:14px;color:var(--muted);gap:10px}
+  .spin{width:18px;height:18px;border:2.5px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:6;
+    background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 18px;
+    box-shadow:var(--shadow);font-size:13px;color:var(--muted);display:none}
+  .badgechip{font-size:11px;padding:2px 8px;border-radius:20px;background:var(--accent-soft);color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <b>Granted Environmental Clearances — India</b>
+      <span>PARIVESH 2.0 · data as of 8 Aug 2026 <span class="badgechip" id="scopechip">2026</span></span>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="n" id="kpiTotal">—</div><div class="l">Granted (view)</div></div>
+      <div class="kpi"><div class="n" id="kpiStates">—</div><div class="l">States with grants</div></div>
+    </div>
+  </header>
+
+  <div class="body">
+    <aside>
+      <button class="resetbtn" id="reset">⤢ Reset view</button>
+
+      <div class="group">
+        <h3>Clearance type</h3>
+        <div class="seg" id="typeSeg">
+          <button data-t="ALL" aria-pressed="true">All</button>
+          <button data-t="EC">EC</button>
+          <button data-t="FC">FC</button>
+          <button data-t="CRZ">CRZ</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <h3>Year granted</h3>
+        <div class="seg years" id="yearSeg">
+          <button data-y="2023">2023</button>
+          <button data-y="2024">2024</button>
+          <button data-y="2025">2025</button>
+          <button data-y="2026" aria-pressed="true">2026</button>
+          <button data-y="ALL">All</button>
+        </div>
+        <div class="hint">2026 is a partial year. 2025 is the largest.</div>
+      </div>
+
+      <div class="group">
+        <h3>Find a state / UT</h3>
+        <input type="search" id="stateSearch" list="stateList" placeholder="Type a state name…" autocomplete="off">
+        <datalist id="stateList"></datalist>
+        <div class="hint">Selecting a state zooms the map to it. Or just scroll to zoom anywhere.</div>
+      </div>
+
+      <div class="group legend" id="legendBox">
+        <h3 id="legendTitle">Granted proposals / state</h3>
+        <div id="legendBody"></div>
+      </div>
+
+      <footer>
+        Boundaries © DataMeet / LGD / Survey of India (CC-BY-4.0). Clearance data:
+        Government of India, PARIVESH 2.0. Snapshot 8 Aug 2026; the live portal grows daily.
+        v1 shows granted proposals only (FC Stage-II; WL excluded).
+      </footer>
+    </aside>
+
+    <div class="mapwrap" id="mapwrap">
+      <div class="mtitle"><b id="viewName">India</b><br><span id="viewSub"></span></div>
+      <svg id="map" preserveAspectRatio="xMidYMid meet"></svg>
+      <canvas id="pts"></canvas>
+      <div class="zoomctl"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
+      <div class="scrollhint">Scroll to zoom · drag to pan · zoom in to reveal projects</div>
+      <div class="empty" id="emptyMsg"></div>
+      <div class="maplegend" id="mapLegend"></div>
+      <div class="tip" id="tip"></div>
+      <div class="overlay" id="overlay"><div class="spin"></div><span>Loading map data…</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const TYPES=["EC","FC","CRZ"], TYPE_COLORS=["#2563eb","#159a5b","#ea580c"];
+const RAMP=["#fff5f0","#fee0d2","#fcbba1","#fc9272","#fb6a4a","#de2d26","#a50f15"];
+const THRESH=3.2;                      // zoom at which project dots appear
+const filters={type:"ALL",year:"2026"};
+let STATES=null,COUNTS=null,PROPS=null,COMP={},detailReady=false;
+let W=0,H=0,BASEPROJ=null,breaks=[],labelData=[],FLAT=[],PTSCREEN=[];
+let T={k:1,tx:0,ty:0};
+const $=s=>document.querySelector(s);
+const svg=$("#map"),cv=$("#pts"),ctx=cv.getContext("2d"),tip=$("#tip"),NS="http://www.w3.org/2000/svg";
+let vp=null,lbl=null,mk=null;
+
+/* ---------- load ---------- */
+async function boot(){
+  [STATES,COUNTS]=await Promise.all([
+    fetch("states.geojson").then(r=>r.json()),
+    fetch("state_counts.json").then(r=>r.json())]);
+  const dl=$("#stateList");
+  Object.values(COUNTS).map(s=>s.name).sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o);});
+  $("#overlay").style.display="none";
+  buildStatic();
+  Promise.all([
+    fetch("proposals.json").then(r=>r.json()),
+    fetch("company_by_pno.json").then(r=>r.ok?r.json():{}).catch(()=>({}))
+  ]).then(([p,c])=>{PROPS=p;COMP=c||{};detailReady=true;rebuildFlat();applyTransform();});
+}
+
+/* ---------- geo helpers ---------- */
+function mercX(lon){return lon*Math.PI/180;}
+function mercY(lat){return Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));}
+function bboxOf(features){let a=[180,90,-180,-90];const scan=c=>{if(typeof c[0]==="number"){
+  a[0]=Math.min(a[0],c[0]);a[1]=Math.min(a[1],c[1]);a[2]=Math.max(a[2],c[0]);a[3]=Math.max(a[3],c[1]);}else c.forEach(scan);};
+  features.forEach(f=>scan(f.geometry.coordinates));return a;}
+function makeProj(bbox,W,H,pad){
+  const x0=mercX(bbox[0]),x1=mercX(bbox[2]),my0=mercY(bbox[1]),my1=mercY(bbox[3]);
+  const s=Math.min((W-2*pad)/(x1-x0),(H-2*pad)/(my1-my0));
+  const ox=pad+(W-2*pad-(x1-x0)*s)/2, oy=pad+(H-2*pad-(my1-my0)*s)/2;
+  return (lon,lat)=>[ox+(mercX(lon)-x0)*s, oy+(my1-mercY(lat))*s];}
+function projBbox(f){let a=[1e9,1e9,-1e9,-1e9];const scan=c=>{if(typeof c[0]==="number"){
+  const p=BASEPROJ(c[0],c[1]);a[0]=Math.min(a[0],p[0]);a[1]=Math.min(a[1],p[1]);a[2]=Math.max(a[2],p[0]);a[3]=Math.max(a[3],p[1]);}
+  else c.forEach(scan);};scan(f.geometry.coordinates);return a;}
+function pathD(geom,proj){let d="";const ring=r=>{r.forEach((pt,i)=>{const[x,y]=proj(pt[0],pt[1]);
+  d+=(i?"L":"M")+x.toFixed(1)+" "+y.toFixed(1);});d+="Z";};
+  (geom.type==="Polygon"?[geom.coordinates]:geom.coordinates).forEach(poly=>poly.forEach(ring));return d;}
+function projArea(f){let A=0;const ring=r=>{let a=0;for(let i=0,j=r.length-1;i<r.length;j=i++){
+  const p1=BASEPROJ(r[j][0],r[j][1]),p2=BASEPROJ(r[i][0],r[i][1]);a+=p1[0]*p2[1]-p2[0]*p1[1];}A+=Math.abs(a)/2;};
+  (f.geometry.type==="Polygon"?[f.geometry.coordinates]:f.geometry.coordinates).forEach(poly=>ring(poly[0]));return A;}
+// anchor a label/marker at the centroid of the LARGEST enclave (handles multipart
+// UTs like Puducherry whose bbox-centre falls on no actual land).
+function anchorOf(f){
+  const polys=f.geometry.type==="Polygon"?[f.geometry.coordinates]:f.geometry.coordinates;
+  let best=null,bestA=-1;
+  polys.forEach(poly=>{const r=poly[0];let A=0,Cx=0,Cy=0;
+    for(let i=0,j=r.length-1;i<r.length;j=i++){const cr=r[j][0]*r[i][1]-r[i][0]*r[j][1];
+      A+=cr;Cx+=(r[j][0]+r[i][0])*cr;Cy+=(r[j][1]+r[i][1])*cr;}
+    let c;if(Math.abs(A)<1e-12)c=[r[0][0],r[0][1]];else c=[Cx/(3*A),Cy/(3*A)];
+    if(Math.abs(A)>bestA){bestA=Math.abs(A);best=c;}});
+  return best;}
+
+/* ---------- data helpers ---------- */
+function countFor(key){const s=COUNTS[key];if(!s)return 0;
+  const types=filters.type==="ALL"?TYPES:[filters.type];let n=0;
+  for(const t of types){const y=s.counts[t]||{};
+    if(filters.year==="ALL"){for(const k in y)n+=y[k];}else n+=(y[filters.year]||0);}return n;}
+function quantileBreaks(vals,k){const v=vals.filter(x=>x>0).sort((a,b)=>a-b);if(!v.length)return[];
+  const br=[];for(let i=1;i<k;i++)br.push(v[Math.floor(i/k*v.length)]);return[...new Set(br)];}
+function rampColor(n){if(n<=0)return"#f6f1f0";let i=0;while(i<breaks.length&&n>breaks[i])i++;return RAMP[Math.min(i+1,RAMP.length-1)];}
+function fmtNum(n){return n.toLocaleString("en-IN");}
+function fmtDate(s){if(!s)return"—";let d;
+  if(/^\d{4}-\d{2}/.test(s))d=new Date(s.slice(0,10));
+  else{const m={JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+    const p=String(s).split("-");if(p.length===3&&m[(p[1]||"").toUpperCase()]!=null)d=new Date(+p[2],m[p[1].toUpperCase()],+p[0]);}
+  return(!d||isNaN(d))?s:d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"});}
+
+/* ---------- build (filter/resize) ---------- */
+function computeBase(){const r=$("#mapwrap").getBoundingClientRect();W=r.width;H=r.height;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+  BASEPROJ=makeProj(bboxOf(STATES.features),W,H,26);}
+function buildStatic(){
+  computeBase();
+  const feats=STATES.features;
+  breaks=quantileBreaks(feats.map(f=>countFor(f.properties.key)),6);
+  svg.innerHTML="";
+  vp=document.createElementNS(NS,"g");
+  labelData=[];
+  feats.forEach(f=>{
+    const key=f.properties.key,c=countFor(key);
+    const p=document.createElementNS(NS,"path");
+    p.setAttribute("d",pathD(f.geometry,BASEPROJ));
+    p.setAttribute("class","state");p.setAttribute("fill",rampColor(c));
+    p.addEventListener("mousemove",e=>{if(T.k>=THRESH)return;showStateTip(e,f.properties.name,c);});
+    p.addEventListener("mouseleave",hideTip);
+    p.addEventListener("click",()=>{if(dragMoved)return;zoomToState(key);});
+    vp.appendChild(p);
+    const an=anchorOf(f);const bc=BASEPROJ(an[0],an[1]);
+    labelData.push({key,c,bcx:bc[0],bcy:bc[1],area:projArea(f)});
+  });
+  const totA=labelData.reduce((s,d)=>s+d.area,0)||1;
+  labelData.forEach(d=>d.tiny=(d.area/totA)<6e-4);
+  svg.appendChild(vp);
+  lbl=document.createElementNS(NS,"g");svg.appendChild(lbl);
+  mk=document.createElementNS(NS,"g");svg.appendChild(mk);
+  rebuildFlat();
+  updateKPIs();
+  applyTransform();
+}
+function rebuildFlat(){FLAT=[];if(!detailReady||!PROPS)return;
+  const types=filters.type==="ALL"?[0,1,2]:[TYPES.indexOf(filters.type)];
+  for(const key in PROPS)for(const rec of PROPS[key]){
+    if(!types.includes(rec[2]))continue;
+    if(filters.year!=="ALL"&&String(rec[3])!==filters.year)continue;
+    const p=BASEPROJ(rec[0],rec[1]);FLAT.push([p[0],p[1],rec]);}}
+
+/* ---------- transform apply (zoom/pan) ---------- */
+function applyTransform(){
+  vp.setAttribute("transform",`translate(${T.tx},${T.ty}) scale(${T.k})`);
+  const showPts=T.k>=THRESH&&detailReady;
+  // labels + tiny-state markers
+  lbl.innerHTML="";mk.innerHTML="";
+  if(!showPts){
+    labelData.forEach(d=>{
+      const sx=d.bcx*T.k+T.tx, sy=d.bcy*T.k+T.ty;
+      if(sx<-40||sx>W+40||sy<-20||sy>H+20)return;
+      if(d.tiny){                                   // tiny-land state/UT -> ringed marker
+        const c1=document.createElementNS(NS,"circle");
+        c1.setAttribute("cx",sx.toFixed(1));c1.setAttribute("cy",sy.toFixed(1));c1.setAttribute("r",7);
+        c1.setAttribute("class","mk-dot");c1.setAttribute("fill",rampColor(d.c));
+        c1.addEventListener("mousemove",e=>showStateTip(e,COUNTS[d.key].name,d.c));
+        c1.addEventListener("mouseleave",hideTip);
+        c1.addEventListener("click",ev=>{ev.stopPropagation();if(!dragMoved)zoomToState(d.key);});
+        mk.appendChild(c1);
+        const tt=document.createElementNS(NS,"text");tt.setAttribute("class","statelabel");
+        tt.setAttribute("x",sx.toFixed(1));tt.setAttribute("y",(sy-11).toFixed(1));
+        tt.textContent=COUNTS[d.key].name+(d.c?" · "+fmtNum(d.c):"");mk.appendChild(tt);
+      }else if(d.c){
+        const t=document.createElementNS(NS,"text");t.setAttribute("class","statelabel");
+        t.setAttribute("x",sx.toFixed(1));t.setAttribute("y",sy.toFixed(1));t.textContent=fmtNum(d.c);lbl.appendChild(t);
+      }
+    });
+  }
+  // points
+  ctx.clearRect(0,0,W,H);PTSCREEN=[];
+  if(showPts){
+    for(const it of FLAT){const x=it[0]*T.k+T.tx,y=it[1]*T.k+T.ty;
+      if(x<-8||x>W+8||y<-8||y>H+8)continue;
+      ctx.beginPath();ctx.arc(x,y,4,0,6.283);ctx.fillStyle=TYPE_COLORS[it[2][2]]+"cc";ctx.fill();
+      ctx.lineWidth=1;ctx.strokeStyle="#fff";ctx.stroke();PTSCREEN.push([x,y,it[2]]);}
+  }
+  cv.style.pointerEvents=showPts?"auto":"none";
+  $("#reset").classList.toggle("show",T.k>1.02);
+  $("#viewSub").textContent=(filters.type==="ALL"?"All clearances":filters.type)+" · "+
+    (filters.year==="ALL"?"2023–2026":filters.year)+" · "+(showPts?"showing projects":"scroll to zoom in");
+  drawLegend(showPts);
+}
+function updateKPIs(){
+  const feats=STATES.features;
+  const total=feats.reduce((s,f)=>s+countFor(f.properties.key),0);
+  const active=feats.filter(f=>countFor(f.properties.key)>0).length;
+  $("#kpiTotal").textContent=fmtNum(total);
+  $("#kpiStates").textContent=active;
+  $("#scopechip").textContent=(filters.year==="ALL"?"2023–26":filters.year);
+  $("#emptyMsg").style.display=total===0?"block":"none";
+  if(total===0)$("#emptyMsg").textContent="No granted proposals for "+
+    (filters.type==="ALL"?"any type":filters.type)+", "+(filters.year==="ALL"?"2023–2026":filters.year)+".";
+}
+
+/* ---------- legend ---------- */
+function drawLegend(showPts){
+  const sT=$("#legendTitle"),sB=$("#legendBody"),mL=$("#mapLegend");
+  if(showPts){
+    sT.textContent="Project type";
+    const nm={EC:"Environmental (EC)",FC:"Forest (FC)",CRZ:"Coastal (CRZ)"};
+    sB.innerHTML=TYPES.map((t,i)=>`<div class="row"><span class="dot" style="background:${TYPE_COLORS[i]}"></span>${nm[t]}</div>`).join("");
+    mL.innerHTML=`<div class="ttl">Each dot = 1 granted project</div>`+
+      TYPES.map((t,i)=>`<div class="row"><span class="dot" style="background:${TYPE_COLORS[i]}"></span>${t}</div>`).join("");
+  }else{
+    sT.textContent="Granted proposals / state";
+    const rows=[`<div class="row"><span class="swatch" style="background:#f6f1f0"></span>none</div>`];
+    for(let i=0;i<=breaks.length;i++){const lo=i===0?0:breaks[i-1]+1,hi=i<breaks.length?breaks[i]:null;
+      const col=RAMP[Math.min(i+1,RAMP.length-1)];const lab=i===0?"0":hi?`${fmtNum(lo)}–${fmtNum(hi)}`:`${fmtNum(lo)}+`;
+      rows.push(`<div class="row"><span class="swatch" style="background:${col}"></span>${lab}</div>`);}
+    sB.innerHTML=rows.join("");
+    mL.innerHTML=`<div class="ttl">Granted proposals</div><div class="ramp">`+
+      RAMP.slice(1).map(c=>`<i style="background:${c}"></i>`).join("")+
+      `</div><div style="display:flex;justify-content:space-between"><span class="lab">low</span><span class="lab">high</span></div>`;
+  }
+}
+
+/* ---------- tooltips ---------- */
+function posTip(e){const r=$("#mapwrap").getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;
+  tip.style.left=Math.min(x+14,W-tip.offsetWidth-8)+"px";tip.style.top=Math.max(y-10,6)+"px";}
+function showStateTip(e,name,c){tip.innerHTML=`<div class="t">${name}</div><span class="k">${filters.type==="ALL"?"All clearances":filters.type}, ${filters.year==="ALL"?"2023–2026":filters.year}</span><br><b>${fmtNum(c)}</b> granted`;
+  posTip(e);tip.classList.add("show");}
+function hideTip(){tip.classList.remove("show");}
+cv.addEventListener("mousemove",e=>{
+  if(T.k<THRESH||!PTSCREEN.length||dragging){hideTip();return;}
+  const r=cv.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;
+  let best=null,bd=110;
+  for(const p of PTSCREEN){const d=(p[0]-mx)**2+(p[1]-my)**2;if(d<bd){bd=d;best=p[2];}}
+  if(best){const[lon,lat,t,y,area,nm,cat,pno,gd]=best;
+    tip.innerHTML=`<span class="badge" style="background:${TYPE_COLORS[t]}">${TYPES[t]}</span>`+
+      `<div class="t">${nm||"(unnamed project)"}</div>`+
+      `<span class="k">Type</span> ${cat||"—"}<br>`+
+      `<span class="k">Company</span> ${COMP[pno]||"—"}<br>`+
+      `<span class="k">Area</span> ${area?fmtNum(area)+" ha":"—"}<br>`+
+      `<span class="k">Granted</span> ${fmtDate(gd)}`;
+    posTip(e);tip.classList.add("show");}else hideTip();});
+cv.addEventListener("mouseleave",hideTip);
+
+/* ---------- zoom / pan ---------- */
+function clampK(k){return Math.max(1,Math.min(400,k));}
+function zoomAt(cx,cy,factor){const k2=clampK(T.k*factor);const bx=(cx-T.tx)/T.k,by=(cy-T.ty)/T.k;
+  T.k=k2;T.tx=cx-bx*k2;T.ty=cy-by*k2;if(T.k<=1.001){T.k=1;T.tx=0;T.ty=0;}applyTransform();}
+function zoomToState(key){const f=STATES.features.find(f=>f.properties.key===key);if(!f)return;
+  const bb=projBbox(f);const bw=bb[2]-bb[0],bh=bb[3]-bb[1];
+  const k=clampK(Math.min(W/bw,H/bh)*0.82);const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
+  T.k=k;T.tx=W/2-cx*k;T.ty=H/2-cy*k;$("#stateSearch").value=COUNTS[key].name;hideTip();applyTransform();}
+const wrap=$("#mapwrap");
+wrap.addEventListener("wheel",e=>{e.preventDefault();const r=wrap.getBoundingClientRect();
+  zoomAt(e.clientX-r.left,e.clientY-r.top,Math.exp(-e.deltaY*0.0016));},{passive:false});
+let dragging=false,dragMoved=false,lastX=0,lastY=0;
+wrap.addEventListener("pointerdown",e=>{dragging=true;dragMoved=false;lastX=e.clientX;lastY=e.clientY;
+  wrap.classList.add("dragging");wrap.setPointerCapture(e.pointerId);});
+wrap.addEventListener("pointermove",e=>{if(!dragging)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;
+  if(Math.abs(dx)+Math.abs(dy)>3)dragMoved=true;lastX=e.clientX;lastY=e.clientY;
+  T.tx+=dx;T.ty+=dy;hideTip();applyTransform();});
+wrap.addEventListener("pointerup",e=>{dragging=false;wrap.classList.remove("dragging");
+  try{wrap.releasePointerCapture(e.pointerId);}catch(_){}
+  setTimeout(()=>{dragMoved=false;},0);});
+$("#zin").addEventListener("click",()=>zoomAt(W/2,H/2,1.6));
+$("#zout").addEventListener("click",()=>zoomAt(W/2,H/2,1/1.6));
+$("#reset").addEventListener("click",()=>{T={k:1,tx:0,ty:0};$("#stateSearch").value="";applyTransform();});
+
+/* ---------- filters / search / resize ---------- */
+$("#typeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  filters.type=b.dataset.t;[...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",x===b));buildStatic();});
+$("#yearSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  filters.year=b.dataset.y;[...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",x===b));buildStatic();});
+$("#stateSearch").addEventListener("change",e=>{const v=e.target.value.trim().toLowerCase();
+  const f=STATES.features.find(f=>COUNTS[f.properties.key].name.toLowerCase()===v);if(f)zoomToState(f.properties.key);});
+let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{T={k:1,tx:0,ty:0};buildStatic();},150);});
+boot();
+</script>
+</body>
+</html>
