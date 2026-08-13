@@ -6,7 +6,7 @@ clearance in India, built from the Government of India's **PARIVESH 2.0** open d
 <!-- Add a screenshot or GIF here, e.g. map_v1/preview.png -->
 <!-- ![Map preview](map_v1/preview.png) -->
 
-**Live demo:** _add the GitHub Pages URL after enabling Pages_ · **Method & write-up:** [ProjectNotes.md](ProjectNotes.md)
+**Live demo:** https://captainsai2105-cell.github.io/india-environmental-clearances-map/ · **Method & write-up:** [ProjectNotes.md](ProjectNotes.md)
 
 ---
 
