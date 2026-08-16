@@ -43,6 +43,11 @@
   input[type=search]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
     font-size:13px;background:#fff;color:var(--ink)}
   input[type=search]:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .searchrow{display:flex;gap:6px}
+  .searchrow input{flex:1;width:auto}
+  #stateGo{flex:none;border:0;background:var(--accent);color:#fff;font-weight:600;font-size:13px;
+    padding:0 15px;border-radius:9px;cursor:pointer}
+  #stateGo:hover{filter:brightness(1.08)}
   .hint{font-size:11px;color:var(--muted);margin-top:6px}
 
   .resetbtn{display:none;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;
@@ -168,7 +173,10 @@
 
       <div class="group">
         <h3>Find a state / UT</h3>
-        <input type="search" id="stateSearch" list="stateList" placeholder="Type a state name…" autocomplete="off">
+        <div class="searchrow">
+          <input type="search" id="stateSearch" list="stateList" placeholder="Type a state name…" autocomplete="off">
+          <button id="stateGo" type="button">Go</button>
+        </div>
         <datalist id="stateList"></datalist>
         <div class="hint">Selecting a state zooms the map to it. Or just scroll to zoom anywhere.</div>
       </div>
@@ -451,8 +459,12 @@ $("#typeSeg").addEventListener("click",e=>{const b=e.target.closest("button");if
   filters.type=b.dataset.t;[...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",x===b));buildStatic();});
 $("#yearSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
   filters.year=b.dataset.y;[...e.currentTarget.children].forEach(x=>x.setAttribute("aria-pressed",x===b));buildStatic();});
-$("#stateSearch").addEventListener("change",e=>{const v=e.target.value.trim().toLowerCase();
-  const f=STATES.features.find(f=>COUNTS[f.properties.key].name.toLowerCase()===v);if(f)zoomToState(f.properties.key);});
+function goToStateByName(v){v=(v||"").trim().toLowerCase();if(!v)return;
+  const f=STATES.features.find(f=>COUNTS[f.properties.key].name.toLowerCase()===v);
+  if(f){zoomToState(f.properties.key);$("#stateSearch").blur();}}
+$("#stateSearch").addEventListener("change",e=>goToStateByName(e.target.value));
+$("#stateSearch").addEventListener("input",e=>goToStateByName(e.target.value));   // fires when a datalist suggestion is tapped (mobile)
+$("#stateGo").addEventListener("click",()=>goToStateByName($("#stateSearch").value));
 let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{T={k:1,tx:0,ty:0};focusKey=null;buildStatic();},150);});
 boot();
 </script>
