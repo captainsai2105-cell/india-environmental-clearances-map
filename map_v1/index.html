@@ -217,7 +217,8 @@ const THRESH=3.2;                      // zoom at which project dots appear
 const filters={type:"ALL",year:"ALL"};
 let focusKey=null;   // state isolated via search/click; null = show all
 let selectedPno=null;   // clicked project (proposalNo) whose detail card is shown
-let STATES=null,COUNTS=null,PROPS=null,COMP={},detailReady=false;
+let STATES=null,COUNTS=null;
+const LOADED={},LOADING={};   // per-state lazy-loaded project data
 let W=0,H=0,BASEPROJ=null,breaks=[],labelData=[],FLAT=[],PTSCREEN=[],lastW=0;
 let T={k:1,tx:0,ty:0};
 const $=s=>document.querySelector(s);
@@ -233,10 +234,14 @@ async function boot(){
   Object.values(COUNTS).map(s=>s.name).sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o);});
   $("#overlay").style.display="none";
   buildStatic();
-  Promise.all([
-    fetch("proposals.json").then(r=>r.json()),
-    fetch("company_by_pno.json").then(r=>r.ok?r.json():{}).catch(()=>({}))
-  ]).then(([p,c])=>{PROPS=p;COMP=c||{};detailReady=true;rebuildFlat();applyTransform();});
+}
+function slug(k){return k.replace(/\s+/g,"_");}
+function ensureState(key){          // lazy-load a state's projects on demand
+  if(LOADED[key]||LOADING[key])return;
+  LOADING[key]=1;
+  fetch("proposals/"+slug(key)+".json").then(r=>r.ok?r.json():[]).then(a=>{
+    LOADED[key]=a||[];delete LOADING[key];rebuildFlat();applyTransform();
+  }).catch(()=>{LOADED[key]=[];delete LOADING[key];});
 }
 
 /* ---------- geo helpers ---------- */
@@ -319,9 +324,9 @@ function buildStatic(){
   updateKPIs();
   applyTransform();
 }
-function rebuildFlat(){FLAT=[];if(!detailReady||!PROPS)return;
+function rebuildFlat(){FLAT=[];
   const types=filters.type==="ALL"?[0,1,2]:[TYPES.indexOf(filters.type)];
-  for(const key in PROPS)for(const rec of PROPS[key]){
+  for(const key in LOADED)for(const rec of LOADED[key]){
     if(!types.includes(rec[2]))continue;
     if(filters.year!=="ALL"&&String(rec[3])!==filters.year)continue;
     const p=BASEPROJ(rec[0],rec[1]);FLAT.push([p[0],p[1],rec,key]);}}
@@ -333,7 +338,12 @@ function applyTransform(){
     var isF=focusKey&&p.getAttribute("data-key")===focusKey;
     p.style.opacity=(focusKey&&!isF)?"0.1":"1";
     p.classList.toggle("focused",!!isF);});
-  const showPts=(T.k>=THRESH||focusKey)&&detailReady;
+  const showPts=(T.k>=THRESH||focusKey);
+  if(showPts){
+    if(focusKey)ensureState(focusKey);
+    else for(const d of labelData){if(!d.c)continue;const sx=d.bcx*T.k+T.tx,sy=d.bcy*T.k+T.ty;
+      if(sx>-40&&sx<W+40&&sy>-40&&sy<H+40)ensureState(d.key);}
+  }
   // labels + tiny-state markers
   lbl.innerHTML="";mk.innerHTML="";
   if(!showPts){
@@ -421,7 +431,7 @@ function cardHTML(rec){const t=rec[2],area=rec[4],nm=rec[5],cat=rec[6],pno=rec[7
   return `<span class="badge" style="background:${TYPE_COLORS[t]}">${TYPES[t]}</span>`+
     `<div class="t">${nm||"(unnamed project)"}</div>`+
     `<span class="k">Type</span> ${cat||"—"}<br>`+
-    `<span class="k">Company</span> ${COMP[pno]||"—"}<br>`+
+    `<span class="k">Company</span> ${rec[9]||"—"}<br>`+
     `<span class="k">Area</span> ${area?fmtNum(area)+" ha":"—"}<br>`+
     `<span class="k">Granted</span> ${fmtDate(gd)}`;}
 function placeCardBeside(px,py){tip.classList.add("show");
@@ -443,7 +453,7 @@ function selectAt(clientX,clientY){
 function clampK(k){return Math.max(1,Math.min(400,k));}
 function zoomAt(cx,cy,factor){const k2=clampK(T.k*factor);const bx=(cx-T.tx)/T.k,by=(cy-T.ty)/T.k;
   T.k=k2;T.tx=cx-bx*k2;T.ty=cy-by*k2;applyTransform();}
-function zoomToState(key){const f=STATES.features.find(f=>f.properties.key===key);if(!f)return;focusKey=key;
+function zoomToState(key){const f=STATES.features.find(f=>f.properties.key===key);if(!f)return;focusKey=key;ensureState(key);
   const bb=projBbox(f);const bw=bb[2]-bb[0],bh=bb[3]-bb[1];
   const k=clampK(Math.min(W/bw,H/bh)*0.82);const cx=(bb[0]+bb[2])/2,cy=(bb[1]+bb[3])/2;
   T.k=k;T.tx=W/2-cx*k;T.ty=H/2-cy*k;$("#stateSearch").value=COUNTS[key].name;hideTip();applyTransform();}
