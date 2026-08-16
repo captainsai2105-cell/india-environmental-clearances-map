@@ -132,6 +132,60 @@ A **single self-contained HTML file, no external libraries**:
   parts).
 - Served locally via `python -m http.server`; data fetched as sibling JSON files.
 
+### 3.7 Output schema & how a point is placed
+
+The map reads four derived files (all committed to git under `map_v1/`); the raw
+`out/` layers are **not** committed (see the raw-vs-displayed table below).
+
+**`proposals.json`** is keyed by state; each proposal is a compact *positional array*
+(field names omitted to keep 50k rows small):
+
+```
+{ "GUJARAT": [ [70.227, 21.0494, 0, 2025, 1.0, "Shri Madhubhai Hirabhai Velani",
+               "Mining of minerals", "SIA/GJ/MIN/501094/2024",
+               "2025-02-02T19:31:52.392"], ... ], ... }
+```
+
+| Index | Field | Example |
+|---|---|---|
+| 0 | **longitude** | 70.227 |
+| 1 | **latitude** | 21.0494 |
+| 2 | type (0=EC, 1=FC, 2=CRZ) | 0 |
+| 3 | year granted | 2025 |
+| 4 | area (hectares) | 1.0 |
+| 5 | project name | "Shri Madhubhai Hirabhai Velani" |
+| 6 | category | "Mining of minerals" |
+| 7 | proposal number | "SIA/GJ/MIN/501094/2024" |
+| 8 | grant date | "2025-02-02T19:31:52.392" |
+
+The **company name is not in the row** — it is joined at display time from
+`company_by_pno.json` using index 7 (the proposal number).
+
+**How a dot is placed on the map.** Each clearance is really a *polygon* (the project
+boundary). `prep_proposals.py` reduces it to its **centroid** via `shapely`. Because
+the source geometry was fetched as **EPSG:4326**, that centroid is already a
+`(longitude, latitude)` pair — stored as indices 0 and 1. At render time the map's
+**Mercator projection** converts `(lon, lat)` → screen `(x, y)`. Coordinates are
+rounded to 4 dp (~11 m). Full chain:
+
+```
+polygon (raw layer) → centroid (lon,lat) via shapely → [lon, lat, …] in proposals.json
+                    → Mercator projection → pixel on screen
+```
+
+**Raw (on disk, gitignored) vs. displayed (in the map):**
+
+| Layer | In raw `out/` | In the map |
+|---|---|---|
+| EC / FC / CRZ (granted) | ✅ | ✅ |
+| WL (wildlife) | ✅ | ❌ — all "DISPOSED", no grant signal (§5.4) |
+| Forest Land Bank | ✅ | ❌ — not a project clearance |
+| 12 sensitivity layers (PAs, ESZ, tiger reserves…) | ✅ | ❌ — context only (used in overlay analysis, §5.3) |
+
+Raw `out/` = **17 GeoJSONL layers (~1.5 GB)**. The map uses only granted EC/FC/CRZ,
+carried into `proposals.json` (~9.4 MB) + `company_by_pno.json` (~7.7 MB) +
+`states.geojson` (~0.3 MB) + `state_counts.json`.
+
 ---
 
 ## 4. What We Built (Results)
