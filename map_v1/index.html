@@ -310,7 +310,6 @@ function buildStatic(){
     p.setAttribute("class","state");p.setAttribute("fill",rampColor(c));p.setAttribute("data-key",key);
     p.addEventListener("mousemove",e=>{if(T.k>=THRESH||focusKey)return;showStateTip(e,f.properties.name,c);});
     p.addEventListener("mouseleave",hideTip);
-    p.addEventListener("click",()=>{if(dragMoved)return;zoomToState(key);});
     vp.appendChild(p);
     const an=anchorOf(f);const bc=BASEPROJ(an[0],an[1]);
     labelData.push({key,c,bcx:bc[0],bcy:bc[1],area:projArea(f)});
@@ -353,10 +352,9 @@ function applyTransform(){
       if(d.tiny){                                   // tiny-land state/UT -> ringed marker
         const c1=document.createElementNS(NS,"circle");
         c1.setAttribute("cx",sx.toFixed(1));c1.setAttribute("cy",sy.toFixed(1));c1.setAttribute("r",7);
-        c1.setAttribute("class","mk-dot");c1.setAttribute("fill",rampColor(d.c));
+        c1.setAttribute("class","mk-dot");c1.setAttribute("fill",rampColor(d.c));c1.setAttribute("data-key",d.key);
         c1.addEventListener("mousemove",e=>showStateTip(e,COUNTS[d.key].name,d.c));
         c1.addEventListener("mouseleave",hideTip);
-        c1.addEventListener("click",ev=>{ev.stopPropagation();if(!dragMoved)zoomToState(d.key);});
         mk.appendChild(c1);
         const tt=document.createElementNS(NS,"text");tt.setAttribute("class","statelabel");
         tt.setAttribute("x",sx.toFixed(1));tt.setAttribute("y",(sy-11).toFixed(1));
@@ -468,7 +466,11 @@ wrap.addEventListener("pointermove",e=>{if(!dragging||pinching)return;const dx=e
   T.tx+=dx;T.ty+=dy;hideTip();applyTransform();});
 wrap.addEventListener("pointerup",e=>{dragging=false;wrap.classList.remove("dragging");
   try{wrap.releasePointerCapture(e.pointerId);}catch(_){}
-  if(!dragMoved&&!pinching)selectAt(e.clientX,e.clientY);   // tap/click a point -> select
+  if(!dragMoved&&!pinching){
+    if(T.k>=THRESH||focusKey)selectAt(e.clientX,e.clientY);        // points shown -> select a project
+    else{const el=document.elementFromPoint(e.clientX,e.clientY);  // choropleth -> zoom to clicked state
+      const dk=el&&el.getAttribute&&el.getAttribute("data-key");if(dk)zoomToState(dk);}
+  }
   setTimeout(()=>{dragMoved=false;},0);});
 // touch pinch-to-zoom (phones have no scroll-wheel)
 let pinching=false,pinchDist=0;
