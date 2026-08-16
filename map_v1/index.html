@@ -118,7 +118,8 @@
     .kpi .n{font-size:17px}
 
     .body{grid-template-columns:1fr}
-    .mapwrap{order:1;height:62vh;min-height:330px}
+    .mapwrap{order:1;height:54vh;min-height:320px}
+    #legendBox{display:none}
     aside{order:2;border-right:none;border-top:1px solid var(--line);
       overflow:visible;padding:14px 14px 10px;gap:16px}
 
@@ -214,7 +215,7 @@ const THRESH=3.2;                      // zoom at which project dots appear
 const filters={type:"ALL",year:"ALL"};
 let focusKey=null;   // state isolated via search/click; null = show all
 let STATES=null,COUNTS=null,PROPS=null,COMP={},detailReady=false;
-let W=0,H=0,BASEPROJ=null,breaks=[],labelData=[],FLAT=[],PTSCREEN=[];
+let W=0,H=0,BASEPROJ=null,breaks=[],labelData=[],FLAT=[],PTSCREEN=[],lastW=0;
 let T={k:1,tx:0,ty:0};
 const $=s=>document.querySelector(s);
 const svg=$("#map"),cv=$("#pts"),ctx=cv.getContext("2d"),tip=$("#tip"),NS="http://www.w3.org/2000/svg";
@@ -286,7 +287,7 @@ function fmtDate(s){if(!s)return"—";let d;
 function computeBase(){const r=$("#mapwrap").getBoundingClientRect();W=r.width;H=r.height;
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
-  BASEPROJ=makeProj(bboxOf(STATES.features),W,H,26);}
+  BASEPROJ=makeProj(bboxOf(STATES.features),W,H,26);lastW=W;}
 function buildStatic(){
   computeBase();
   const feats=STATES.features;
@@ -465,7 +466,16 @@ function goToStateByName(v){v=(v||"").trim().toLowerCase();if(!v)return;
 $("#stateSearch").addEventListener("change",e=>goToStateByName(e.target.value));
 $("#stateSearch").addEventListener("input",e=>goToStateByName(e.target.value));   // fires when a datalist suggestion is tapped (mobile)
 $("#stateGo").addEventListener("click",()=>goToStateByName($("#stateSearch").value));
-let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{T={k:1,tx:0,ty:0};focusKey=null;buildStatic();},150);});
+let rt;
+function onResize(){
+  const r=$("#mapwrap").getBoundingClientRect();
+  if(lastW&&Math.abs(r.width-lastW)<1){          // height-only change (mobile URL bar) -> keep zoom/focus
+    W=r.width;H=r.height;svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+    applyTransform();return;}
+  const keep=focusKey;T={k:1,tx:0,ty:0};focusKey=null;buildStatic();if(keep)zoomToState(keep);
+}
+window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(onResize,180);});
 boot();
 </script>
 </body>
