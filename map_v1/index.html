@@ -28,9 +28,9 @@
   .kpi .n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent)}
   .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
 
-  .body{display:grid;grid-template-columns:296px 1fr;min-height:0}
+  .body{display:grid;grid-template-columns:296px 1fr;grid-template-rows:1fr auto;min-height:0}
   aside{background:var(--panel);border-right:1px solid var(--line);padding:18px 18px 14px;
-    overflow:auto;display:flex;flex-direction:column;gap:20px}
+    overflow:auto;display:flex;flex-direction:column;gap:20px;grid-column:1;grid-row:1}
   .group h3{margin:0 0 9px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
 
   .seg{display:flex;background:var(--accent-soft);border-radius:10px;padding:3px;gap:2px}
@@ -59,10 +59,11 @@
   .swatch{width:16px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.06)}
   .dot{width:11px;height:11px;border-radius:50%;flex:none}
 
-  footer{margin-top:auto;font-size:10.5px;color:var(--muted);line-height:1.5}
+  footer{grid-column:1;grid-row:2;background:var(--panel);border-right:1px solid var(--line);
+    padding:0 18px 16px;font-size:10.5px;color:var(--muted);line-height:1.5}
   footer a{color:var(--accent);text-decoration:none}
 
-  .mapwrap{position:relative;min-width:0;overflow:hidden;cursor:grab;touch-action:none}
+  .mapwrap{position:relative;min-width:0;overflow:hidden;cursor:grab;touch-action:none;grid-column:2;grid-row:1 / 3}
   .mapwrap.dragging{cursor:grabbing}
   #map{position:absolute;inset:0;width:100%;height:100%;display:block}
   #pts{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
@@ -117,11 +118,12 @@
     .brand span{font-size:10.5px}
     .kpi .n{font-size:17px}
 
-    .body{grid-template-columns:1fr}
-    .mapwrap{order:1;height:54vh;min-height:320px}
+    .body{display:flex;flex-direction:column}
+    aside{order:1;border-right:none;border-bottom:1px solid var(--line);
+      overflow:visible;padding:14px 14px 12px;gap:16px}
+    .mapwrap{order:2;height:54vh;min-height:320px}
+    footer{order:3;border-right:none;padding:12px 14px 16px}
     #legendBox{display:none}
-    aside{order:2;border-right:none;border-top:1px solid var(--line);
-      overflow:visible;padding:14px 14px 10px;gap:16px}
 
     .seg button{padding:9px 4px}
     input[type=search]{padding:11px}
@@ -186,12 +188,6 @@
         <h3 id="legendTitle">Granted proposals / state</h3>
         <div id="legendBody"></div>
       </div>
-
-      <footer>
-        Boundaries © DataMeet / LGD / Survey of India (CC-BY-4.0). Clearance data:
-        Government of India, PARIVESH 2.0. Snapshot 8 Aug 2026; the live portal grows daily.
-        v1 shows granted proposals only (FC Stage-II; WL excluded).
-      </footer>
     </aside>
 
     <div class="mapwrap" id="mapwrap">
@@ -205,6 +201,11 @@
       <div class="tip" id="tip"></div>
       <div class="overlay" id="overlay"><div class="spin"></div><span>Loading map data…</span></div>
     </div>
+    <footer>
+      Boundaries © DataMeet / LGD / Survey of India (CC-BY-4.0). Clearance data:
+      Government of India, PARIVESH 2.0. Snapshot 8 Aug 2026; the live portal grows daily.
+      v1 shows granted proposals only (FC Stage-II; WL excluded).
+    </footer>
   </div>
 </div>
 
