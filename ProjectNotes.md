@@ -200,6 +200,37 @@ An interactive, filterable map of **50,185 granted clearances** across 36 states
 
 ---
 
+## 4A. v1.1 — interaction & performance updates (17 Aug 2026)
+
+Shipped after the first build; all live.
+
+**Interactions**
+- **Focus mode:** searching or clicking a state isolates it — the state keeps its colour
+  and gains a **dark boundary**, all others fade, and only its projects show.
+- **Click/tap a project** → the point gets a highlight ring and a detail card appears
+  **beside it (never on top)**. Click empty space to dismiss.
+- **No auto-reset:** zooming/scrolling out no longer snaps back to India — reset is only
+  via the **Reset** button.
+- Desktop gotcha fixed: the pan handler's `setPointerCapture` swallows the `click` event,
+  so all point/state selection is done on **`pointerup`** (works on mouse and touch).
+
+**Mobile**
+- Responsive layout — **filters on top, map below, footer at bottom** (search visible on
+  load); **pinch-to-zoom** (phones have no scroll-wheel); search via tap-a-suggestion or a
+  **Go** button; and the **reset-on-scroll bug fixed** (height-only resizes from the mobile
+  address bar are ignored).
+
+**Performance — per-state lazy loading**
+- `proposals.json` is split into one small file per state: **`map_v1/proposals/<STATE>.json`**,
+  with the **company name inlined as index 9**. Initial load fetches only `states.geojson`
+  + `state_counts.json` (~0.3 MB) → instant choropleth; a state's projects load on demand
+  when opened/zoomed. The old ~17 MB upfront load (proposals + company) is gone. New
+  pipeline step: `pipeline/split_states.py`.
+
+**Default view:** All clearance types + All years (2023–2026) = **50,184** mapped.
+
+---
+
 ## 5. Verified Findings
 
 ### 5.1 PARIVESH 2.0 geometry is clean (the positive headline)

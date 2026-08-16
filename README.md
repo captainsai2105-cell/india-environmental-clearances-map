@@ -33,6 +33,8 @@ In brief: pulled 67,633 project boundaries from PARIVESH 2.0's GIS server (worki
 broken TLS chain, four coordinate systems, and error-as-HTTP-200 quirks), filtered to *granted*
 proposals, **derived project areas from geometry**, enriched proponent names via the metadata
 API, joined to DataMeet state boundaries, and rendered a dependency-free interactive map.
+Project data is **lazy-loaded per state** (one small file each) for a fast first paint —
+search or click a state to isolate and zoom to it, then click any project for its details.
 
 ## Important caveats (please read before drawing conclusions)
 

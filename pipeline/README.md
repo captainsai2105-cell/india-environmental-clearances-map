@@ -32,4 +32,9 @@ Full context, endpoints, and query parameters are in [`../ProjectNotes.md`](../P
 6. **(optional) `python pipeline/rebuild_manifest.py out`** → rebuilds `out/manifest.json`
    offline from whatever layers are on disk.
 
+7. **`python pipeline/split_states.py`** → `map_v1/proposals/<STATE>.json`
+   Splits `proposals.json` into one small file per state and **inlines the company name as
+   index 9**. The map lazy-loads these per state (fast first paint); required for the live
+   site. `company_by_pno.json` is no longer fetched by the map at runtime.
+
 Then serve the map: `python -m http.server 8137 --directory map_v1`.
