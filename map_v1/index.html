@@ -63,6 +63,7 @@
   #pts{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .state{stroke:#ffffff;stroke-width:.8;cursor:pointer;vector-effect:non-scaling-stroke;transition:fill .3s}
   .state:hover{stroke:#12211b;stroke-width:1.4}
+  .state.focused{stroke:#111;stroke-width:2.6}
   .mk-dot{stroke:var(--accent);stroke-width:1.8;cursor:pointer}
   .mk-dot:hover{stroke-width:2.8}
   .statelabel{font-size:10px;fill:#14261e;pointer-events:none;text-anchor:middle;
@@ -293,7 +294,9 @@ function rebuildFlat(){FLAT=[];if(!detailReady||!PROPS)return;
 function applyTransform(){
   vp.setAttribute("transform",`translate(${T.tx},${T.ty}) scale(${T.k})`);
   vp.querySelectorAll("path.state").forEach(p=>{
-    p.style.opacity=(focusKey&&p.getAttribute("data-key")!==focusKey)?"0.1":"1";});
+    var isF=focusKey&&p.getAttribute("data-key")===focusKey;
+    p.style.opacity=(focusKey&&!isF)?"0.1":"1";
+    p.classList.toggle("focused",!!isF);});
   const showPts=(T.k>=THRESH||focusKey)&&detailReady;
   // labels + tiny-state markers
   lbl.innerHTML="";mk.innerHTML="";
