@@ -372,6 +372,7 @@ function applyTransform(){
       ctx.lineWidth=3;ctx.strokeStyle="#111";ctx.stroke();
       tip.innerHTML=cardHTML(sel[2]);placeCardBeside(sel[0],sel[1]);}
     else{selectedPno=null;tip.classList.remove("show");}}
+  else tip.classList.remove("show");
   cv.style.pointerEvents=showPts?"auto":"none";
   $("#reset").classList.toggle("show",T.k>1.02);
   $("#viewSub").textContent=(filters.type==="ALL"?"All clearances":filters.type)+" · "+
@@ -431,12 +432,12 @@ function placeCardBeside(px,py){tip.classList.add("show");
   else if(px-18-cw>=6){x=px-18-cw;y=cy;}                 // left of point
   else{x=Math.max(6,Math.min(px-cw/2,W-cw-6));y=(py-ch-16>=6)?py-ch-16:py+16;}  // above/below
   tip.style.left=x+"px";tip.style.top=y+"px";}
-cv.addEventListener("click",e=>{
-  if(dragMoved)return;
-  const r=cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+function selectAt(clientX,clientY){
+  const r=cv.getBoundingClientRect(),mx=clientX-r.left,my=clientY-r.top;
   let best=null,bd=220;
   for(const p of PTSCREEN){const d=(p[0]-mx)**2+(p[1]-my)**2;if(d<bd){bd=d;best=p[2];}}
-  selectedPno=best?best[7]:null;applyTransform();});
+  const np=best?best[7]:null;
+  if(np!==selectedPno){selectedPno=np;applyTransform();}}
 
 /* ---------- zoom / pan ---------- */
 function clampK(k){return Math.max(1,Math.min(400,k));}
@@ -457,6 +458,7 @@ wrap.addEventListener("pointermove",e=>{if(!dragging||pinching)return;const dx=e
   T.tx+=dx;T.ty+=dy;hideTip();applyTransform();});
 wrap.addEventListener("pointerup",e=>{dragging=false;wrap.classList.remove("dragging");
   try{wrap.releasePointerCapture(e.pointerId);}catch(_){}
+  if(!dragMoved&&!pinching)selectAt(e.clientX,e.clientY);   // tap/click a point -> select
   setTimeout(()=>{dragMoved=false;},0);});
 // touch pinch-to-zoom (phones have no scroll-wheel)
 let pinching=false,pinchDist=0;
