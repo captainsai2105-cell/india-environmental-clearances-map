@@ -9,6 +9,13 @@ boundaries/
 # Private working notes (internal AI-agent context; contains candid infra notes)
 CLAUDE.md
 
+# Personal drafts and Office temp files. Blanket-ignored for the same reason as
+# *.pdf above: anything of this kind in this tree is a working document, not
+# part of the published project, and `git add -A` should never sweep one into a
+# public repo. ~$* catches the lock file Word leaves behind while a doc is open.
+*.docx
+~$*
+
 # Audit scratch / intermediates (not needed publicly)
 query.json
 query_2.json
