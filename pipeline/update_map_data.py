@@ -295,7 +295,12 @@ class Enricher:
     def __init__(self, ctx, delay=1.0, timeout=15, budget=600.0, max_fails=8):
         self.ctx, self.delay, self.timeout = ctx, delay, timeout
         self.budget, self.max_fails = budget, max_fails
-        self.t0 = time.monotonic()
+        # Started on FIRST USE, not here. The Enricher is constructed before the
+        # census; when a slow census ran 1,704s, a budget clocked from
+        # construction was already spent and every lookup was skipped without a
+        # single call being attempted. The budget is meant to bound the
+        # enrichment phase, not the whole run.
+        self.t0 = None
         self.fails = self.ok = self.skipped = 0
         self.off = None                      # reason enrichment stopped, if it did
 
@@ -308,6 +313,8 @@ class Enricher:
         if self.off:
             self.skipped += 1
             return ""
+        if self.t0 is None:
+            self.t0 = time.monotonic()
         if time.monotonic() - self.t0 > self.budget:
             self._disable(f"budget of {self.budget:.0f}s spent")
             self.skipped += 1

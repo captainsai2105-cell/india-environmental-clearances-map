@@ -30,6 +30,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # The tip of main, NOT the SHA this run was pinned to. A workflow run
+          # is pinned to the commit that started it, so when update-data.yml
+          # calls this workflow the default checkout predates the data commit
+          # that job just pushed -- it published the previous map and reported
+          # success. Left alone that repeats every week, always one run behind,
+          # green every time. Pages should serve the tip of the default branch
+          # regardless of which trigger got us here.
+          ref: main
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload map_v1 as the site

@@ -33,7 +33,10 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # A slow census alone took 28 minutes on 26 Aug; add the enrichment budget
+    # and 45 was too tight. Not unbounded either -- a genuinely stuck run should
+    # die and open an issue, not idle for hours.
+    timeout-minutes: 60
     permissions:
       contents: write
     outputs:
