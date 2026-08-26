@@ -58,10 +58,14 @@ jobs:
       # on Linux it defers to that same bundle. The missing anchor now ships in
       # pipeline/certs/isrg-root-yr.pem and build_ssl_context() adds it to the
       # system store automatically, so no flag is needed here. Never --insecure.
+      #
+      # -u matters: without it Python block-buffers stdout when it is not a
+      # TTY, and a job killed at the timeout discards the whole buffer. Run #2
+      # ran for 45 minutes and produced not one line of output.
       - name: Refresh from PARIVESH
         id: update
         run: |
-          python pipeline/update_map_data.py ${{ inputs.dry_run && '--dry-run' || '' }}
+          python -u pipeline/update_map_data.py ${{ inputs.dry_run && '--dry-run' || '' }}
 
       - name: Commit
         id: commit
@@ -94,9 +98,11 @@ jobs:
 
   # Without this the failure mode is silence: the map simply stops moving and
   # nobody notices for a month.
+  # failure() alone is not enough: a job killed at the timeout is CANCELLED, not
+  # failed, so run #2 hit the 45-minute limit and told nobody.
   notify:
     needs: [update, deploy]
-    if: failure()
+    if: failure() || cancelled()
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -106,7 +112,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh issue create --repo "$GITHUB_REPOSITORY" \
-            --title "Weekly data update failed on $(date -u +%Y-%m-%d)" \
+            --title "Weekly data update did not complete on $(date -u +%Y-%m-%d)" \
             --body "The scheduled PARIVESH refresh failed.
 
           Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID

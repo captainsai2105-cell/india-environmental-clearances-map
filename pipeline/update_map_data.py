@@ -275,23 +275,64 @@ def fetch_geometry(cli, cfg, oids):
     return got
 
 
-def company_of(ctx, pno, delay=1.0, timeout=60):
-    """Proponent name for one proposal (~0.25 s). The bulk advanceSearchData
-    pull is 13 MB per state; for a few hundred new proposals a week this
-    endpoint is cheaper by orders of magnitude."""
-    url = PORTAL + "?" + urllib.parse.urlencode({"proposalNo": pno})
-    try:
-        req = urllib.request.Request(
-            url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"})
-        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as r:
-            j = json.loads(r.read())
-        rows = j.get("data") or []
-        return (rows[0].get("nameOfUserAgency") or "").strip() if rows else ""
-    except Exception as e:  # noqa: BLE001 -- a miss is retried on the next run
-        print(f"      company lookup failed for {pno}: {e}")
-        return ""
-    finally:
-        time.sleep(delay)
+class Enricher:
+    """Proponent names for new proposals, from the portal (~0.25 s each locally).
+    The bulk advanceSearchData pull is 13 MB per state; for a few hundred new
+    proposals a week this endpoint is cheaper by orders of magnitude.
+
+    TIME-BOXED, AND FAILS OPEN. The names are a nice-to-have; the geometry and
+    the counts are the product. An earlier version let this phase run unbounded
+    with a 60 s per-call timeout, and when the portal turned out to be slow from
+    a GitHub runner it consumed the entire 45-minute job and the run was killed
+    having written nothing. So: a short per-call timeout, a budget for the whole
+    phase, and a circuit breaker that gives up after a run of consecutive
+    failures rather than proving the point 200 times.
+
+    Whatever is missed is stored as "" and retried on the next run, which is the
+    same path that already handles a lookup returning no name.
+    """
+
+    def __init__(self, ctx, delay=1.0, timeout=15, budget=600.0, max_fails=8):
+        self.ctx, self.delay, self.timeout = ctx, delay, timeout
+        self.budget, self.max_fails = budget, max_fails
+        self.t0 = time.monotonic()
+        self.fails = self.ok = self.skipped = 0
+        self.off = None                      # reason enrichment stopped, if it did
+
+    def _disable(self, why):
+        self.off = why
+        print(f"      proponent lookups disabled: {why}. "
+              f"{self.ok} resolved, remainder left blank and retried next run")
+
+    def name(self, pno) -> str:
+        if self.off:
+            self.skipped += 1
+            return ""
+        if time.monotonic() - self.t0 > self.budget:
+            self._disable(f"budget of {self.budget:.0f}s spent")
+            self.skipped += 1
+            return ""
+        url = PORTAL + "?" + urllib.parse.urlencode({"proposalNo": pno})
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "Mozilla/5.0",
+                              "Accept": "application/json"})
+            with urllib.request.urlopen(req, context=self.ctx,
+                                        timeout=self.timeout) as r:
+                j = json.loads(r.read())
+            rows = j.get("data") or []
+            self.fails = 0
+            self.ok += 1
+            return (rows[0].get("nameOfUserAgency") or "").strip() if rows else ""
+        except Exception as e:  # noqa: BLE001 -- retried on the next run
+            self.fails += 1
+            print(f"      company lookup failed for {pno}: "
+                  f"{type(e).__name__}: {str(e)[:60]}")
+            if self.fails >= self.max_fails:
+                self._disable(f"{self.fails} consecutive failures")
+            return ""
+        finally:
+            time.sleep(self.delay)
 
 
 # --------------------------------------------------------------------------- #
@@ -313,6 +354,11 @@ def main() -> int:
                          "in form_class.py; they are never counted either way")
     ap.add_argument("--company-retries", type=int, default=200,
                     help="records whose proponent lookup failed earlier to retry")
+    ap.add_argument("--company-timeout", type=float, default=15.0,
+                    help="per-lookup timeout; short on purpose, these are optional")
+    ap.add_argument("--company-budget", type=float, default=600.0,
+                    help="seconds for the whole proponent phase before it gives "
+                         "up and leaves the rest blank for the next run")
     ap.add_argument("--delay", type=float, default=1.0)
     ap.add_argument("--cafile")
     ap.add_argument("--insecure", action="store_true")
@@ -329,6 +375,8 @@ def main() -> int:
 
     ctx = build_ssl_context(args.cafile, args.insecure)
     cli = Client(ctx, delay=args.delay)
+    names = Enricher(ctx, delay=args.delay, timeout=args.company_timeout,
+                     budget=args.company_budget)
 
     # ---- census -----------------------------------------------------------
     target, upstream = {}, {}
@@ -426,7 +474,7 @@ def main() -> int:
             skipped += 1     # empty or degenerate geometry: as prep_proposals does
             continue
         lon, lat, area = g
-        company = "" if args.dry_run else company_of(ctx, pno, args.delay)
+        company = "" if args.dry_run else names.name(pno)
         appends.append((t["bucket"], t["state"],
                         [lon, lat, t["tidx"], t["year"], area, t["name"],
                          t["cat"], pno, t["gdate"], company]))
@@ -474,7 +522,9 @@ def main() -> int:
                     if retried >= args.company_retries:
                         break
                     if not r[9]:
-                        r[9] = company_of(ctx, r[7], args.delay)
+                        if names.off:          # circuit tripped; stop scanning
+                            break
+                        r[9] = names.name(r[7])
                         if r[9]:
                             dirty.add((bucket, key))
                         retried += 1
@@ -491,6 +541,9 @@ def main() -> int:
         for v in store[form_class.ADMIN].values() for r in v if r[7] in target)
     missing_company = sum(1 for b in store.values() for v in b.values()
                           for r in v if not r[9])
+    if not args.dry_run:
+        print(f"proponents: {names.ok:,} resolved, {names.skipped:,} skipped"
+              + (f" ({names.off})" if names.off else ""))
     print(f"result: {total:,} shown "
           f"(EC {by_type[0]:,} / FC {by_type[1]:,} / CRZ {by_type[2]:,}) "
           f"+ {excl:,} excluded, {len(dirty)} files touched, "
