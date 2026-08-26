@@ -140,6 +140,15 @@ class ArcGISError(Exception):
     """Server returned an error object with HTTP 200."""
 
 
+# The GIS host serves leaf + intermediate and stops, at a root the client must
+# already trust. Windows AIA-chases for the missing link; OpenSSL does not, so
+# on Linux the handshake fails outright unless the OS bundle already carries
+# ISRG Root YR -- GitHub's ubuntu-latest runner does not. See the header of this
+# file for the full account.
+BUNDLED_CA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "pipeline", "certs", "isrg-root-yr.pem")
+
+
 def build_ssl_context(cafile, insecure) -> ssl.SSLContext:
     if insecure:
         print("WARNING: TLS verification disabled.", file=sys.stderr)
@@ -147,8 +156,25 @@ def build_ssl_context(cafile, insecure) -> ssl.SSLContext:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
         return ctx
+
+    # ADD to the system trust store, never replace it. The portal host serves a
+    # complete chain and verifies against the system CAs; only the GIS host
+    # needs the extra anchor. Replacing the store would make this script
+    # dependent on one pinned certificate for every host it talks to, and would
+    # start failing the day that certificate is rotated.
     if cafile:
-        return ssl.create_default_context(cafile=cafile)
+        ctx = ssl.create_default_context()
+        ctx.load_verify_locations(cafile=cafile)
+        print(f"TLS: system trust store + {cafile}")
+        return ctx
+    if os.path.exists(BUNDLED_CA):
+        ctx = ssl.create_default_context()
+        ctx.load_verify_locations(cafile=BUNDLED_CA)
+        print("TLS: system trust store + bundled ISRG Root YR")
+        return ctx
+
+    # No bundled anchor: fall back to truststore, which AIA-chases on Windows
+    # and macOS. On Linux it defers to the same OS bundle and will NOT help.
     try:
         import truststore  # noqa: PLC0415
         print("TLS: OS trust store (truststore)")

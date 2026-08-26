@@ -53,11 +53,11 @@ jobs:
         run: pip install shapely pyproj truststore
 
       # TLS: bharatmapsparivesh serves only leaf + intermediate, so the chain
-      # terminates at a root the client must already trust. Windows AIA-chases
-      # for the missing link; OpenSSL does not, so this depends on the runner's
-      # ca-certificates carrying that root. If a run ever dies with
-      # CERTIFICATE_VERIFY_FAILED, commit the root to pipeline/certs/ and add
-      # `--cafile pipeline/certs/parivesh-chain.pem` below. Never --insecure.
+      # terminates at a root the runner's bundle does not carry. Run #1 died
+      # here with CERTIFICATE_VERIFY_FAILED; truststore does not help, because
+      # on Linux it defers to that same bundle. The missing anchor now ships in
+      # pipeline/certs/isrg-root-yr.pem and build_ssl_context() adds it to the
+      # system store automatically, so no flag is needed here. Never --insecure.
       - name: Refresh from PARIVESH
         id: update
         run: |
