@@ -32,9 +32,64 @@ Full context, endpoints, and query parameters are in [`../ProjectNotes.md`](../P
 6. **(optional) `python pipeline/rebuild_manifest.py out`** → rebuilds `out/manifest.json`
    offline from whatever layers are on disk.
 
-7. **`python pipeline/split_states.py`** → `map_v1/proposals/<STATE>.json`
-   Splits `proposals.json` into one small file per state and **inlines the company name as
-   index 9**. The map lazy-loads these per state (fast first paint); required for the live
-   site. `company_by_pno.json` is no longer fetched by the map at runtime.
+7. **`python pipeline/split_states.py`** → `map_v1/proposals/<STATE>.json` and
+   `map_v1/proposals_excluded/<STATE>.json`
+   Splits the cold-build JSON into one small file per state and **inlines the company name
+   as index 9**. The map lazy-loads the first set per state (fast first paint); required
+   for the live site. `company_by_pno.json` is no longer fetched by the map at runtime.
+
+## What counts as a clearance
+
+Filtering on status alone over-counts. `pipeline/form_class.py` classifies every
+`form_type` as **GRANT**, **ADMIN** or **UNKNOWN**, and both the cold build and the weekly
+updater import it — one table, so the two paths cannot drift.
+
+ADMIN records — transfers, amendments, validity extensions, corrigenda, splittings and
+surrenders — are actions on a clearance that already exists. They are **published**, under
+`map_v1/proposals_excluded/`, not deleted: shown + excluded reconciles to every
+granted-status record, so the headline figure can be checked, and re-classifying a form
+later is a local edit that needs no geometry re-fetched.
+
+UNKNOWN is a sentinel, not a category: a `form_type` absent from the table is neither
+counted nor silently dropped. The updater reports it and aborts past a threshold. Read
+`form_class.py` before changing any of it — it records which parts are the ministry's own
+categories and which are our judgment.
 
 Then serve the map: `python -m http.server 8137 --directory map_v1`.
+
+## Keeping it current
+
+Steps 1–7 are the **cold build**. Day to day the map is refreshed incrementally by
+
+```
+python pipeline/update_map_data.py --dry-run   # report the diff
+python pipeline/update_map_data.py             # apply it
+```
+
+which needs only `shapely`, `pyproj` and `truststore` — no `out/`, no geopandas.
+`.github/workflows/update-data.yml` runs it weekly (Sun 20:30 UTC) and redeploys.
+
+It works by **censusing each layer's attributes** (no geometry — 2000 rows in
+~1.4 s, against a geometry pull that runs to hundreds of MB) and diffing that
+against `map_v1/proposals/<STATE>.json`, then fetching geometry only for the
+proposals that are actually new. A date watermark was the first design and does
+not work: every `KML_Edit` field is a string, FC's Stage-II date is
+`DD-MON-YYYY` and does not sort, and `sync_date` records when the KML was
+pushed rather than when the decision changed — 98.8% of FC Stage-II approvals
+carry a `sync_date` predating their own approval.
+
+Because it is a diff and not a watermark, every run is a full reconciliation:
+additions, withdrawals and amendments are all picked up, and a skipped week
+costs nothing. It writes `map_v1/data_meta.json`, from which the map takes its
+"data as of" date and a cache-busting version for the per-state files.
+
+`map_v1/proposals.json` and `map_v1/company_by_pno.json` are inputs to the cold
+build only. They are gitignored: the map and the updater both read the per-state
+files, where the proponent name is already inlined at index 9.
+
+To top up the raw `out/` layers the same way (append rows new since the last
+pull, rather than re-downloading 951 MB):
+
+```
+python parivesh_pull.py --incremental
+```

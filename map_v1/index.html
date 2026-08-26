@@ -142,7 +142,7 @@
   <header>
     <div class="brand">
       <b>Granted Environmental Clearances — India</b>
-      <span>PARIVESH 2.0 · data as of 8 Aug 2026 <span class="badgechip" id="scopechip">2026</span></span>
+      <span>PARIVESH 2.0 · data as of <span id="asof">8 Aug 2026</span> <span class="badgechip" id="scopechip">2026</span></span>
     </div>
     <div class="kpis">
       <div class="kpi"><div class="n" id="kpiTotal">—</div><div class="l">Granted (view)</div></div>
@@ -165,14 +165,10 @@
 
       <div class="group">
         <h3>Year granted</h3>
-        <div class="seg years" id="yearSeg">
-          <button data-y="2023">2023</button>
-          <button data-y="2024">2024</button>
-          <button data-y="2025">2025</button>
-          <button data-y="2026">2026</button>
-          <button data-y="ALL" aria-pressed="true">All</button>
-        </div>
-        <div class="hint">2026 is a partial year. 2025 is the largest.</div>
+        <!-- buttons are built from the data in boot(); the year range moves on
+             its own as the scheduled update pulls in a new year -->
+        <div class="seg years" id="yearSeg"></div>
+        <div class="hint" id="yearHint"></div>
       </div>
 
       <div class="group">
@@ -203,9 +199,10 @@
       <div class="overlay" id="overlay"><div class="spin"></div><span>Loading map data…</span></div>
     </div>
     <footer>
+      <span id="scopenote">Counts unique clearances granted 2023–2026.</span>
       Boundaries © DataMeet / LGD / Survey of India (CC-BY-4.0). Clearance data:
-      Government of India, PARIVESH 2.0. Snapshot 8 Aug 2026; the live portal grows daily.
-      v1 shows granted proposals only (FC Stage-II; WL excluded).
+      Government of India, PARIVESH 2.0. Snapshot <span id="asofFoot">8 Aug 2026</span>; updated weekly; the live portal grows daily.
+      Granted proposals only (FC Stage-II; WL excluded).
     </footer>
   </div>
 </div>
@@ -226,20 +223,61 @@ const svg=$("#map"),cv=$("#pts"),ctx=cv.getContext("2d"),tip=$("#tip"),NS="http:
 let vp=null,lbl=null,mk=null;
 
 /* ---------- load ---------- */
+let VER="";                         // data version: cache-buster for the per-state files
 async function boot(){
+  // data_meta.json is rewritten by every scheduled update, so the snapshot date
+  // shown in the header comes from the data itself and can never go stale.
+  // Its timestamp also versions the per-state fetches: Pages caches aggressively
+  // and a returning visitor would otherwise keep last week's points.
+  const meta=await fetch("data_meta.json").then(r=>r.ok?r.json():null).catch(()=>null);
+  if(meta){
+    VER="?v="+encodeURIComponent(meta.generated_at);
+    if(meta.snapshot_label){$("#asof").textContent=meta.snapshot_label;
+      $("#asofFoot").textContent=meta.snapshot_label;}
+    // The exclusion note is generated from the run's own tallies, never typed
+    // into this file — a hardcoded count would be wrong after the next update.
+    const ex=meta.excluded;
+    if(ex&&ex.total){
+      $("#scopenote").innerHTML="Counts unique clearances <b>granted</b> 2023–2026. Excludes "+
+        fmtNum(ex.total)+" subsequent actions on clearances that already exist — transfers, "+
+        "amendments, validity extensions, corrigenda, splittings and surrenders. Most relate to "+
+        "clearances granted before PARIVESH 2.0 began in Sept 2022, which this dataset does not "+
+        "cover. Those records are published at <code>proposals_excluded/</code>.";
+    }
+  }
   [STATES,COUNTS]=await Promise.all([
     fetch("states.geojson").then(r=>r.json()),
-    fetch("state_counts.json").then(r=>r.json())]);
+    fetch("state_counts.json"+VER).then(r=>r.json())]);
+  buildYears();
   const dl=$("#stateList");
   Object.values(COUNTS).map(s=>s.name).sort().forEach(n=>{const o=document.createElement("option");o.value=n;dl.appendChild(o);});
   $("#overlay").style.display="none";
   buildStatic();
 }
+/* Year buttons and every year-range label are derived from the data, not
+   written down. Otherwise the first grant of a new year would be counted in
+   the All view but have no button to filter by, until someone noticed. */
+let YRANGE="",YRANGE_SHORT="";
+function buildYears(){
+  const tot={};
+  for(const s of Object.values(COUNTS))
+    for(const t of["EC","FC","CRZ"])
+      for(const y in s.counts[t])tot[y]=(tot[y]||0)+s.counts[t][y];
+  const ys=Object.keys(tot).sort();
+  if(!ys.length)return;
+  const lo=ys[0],hi=ys[ys.length-1];
+  YRANGE=lo+"–"+hi;YRANGE_SHORT=lo+"–"+hi.slice(2);
+  const seg=$("#yearSeg");seg.style.gridTemplateColumns="repeat("+(ys.length+1)+",1fr)";
+  seg.innerHTML=ys.map(y=>'<button data-y="'+y+'">'+y+"</button>").join("")+
+    '<button data-y="ALL" aria-pressed="true">All</button>';
+  const big=ys.reduce((a,b)=>tot[b]>tot[a]?b:a,ys[0]);
+  $("#yearHint").textContent=hi+" is a partial year. "+big+" is the largest.";
+}
 function slug(k){return k.replace(/\s+/g,"_");}
 function ensureState(key){          // lazy-load a state's projects on demand
   if(LOADED[key]||LOADING[key])return;
   LOADING[key]=1;
-  fetch("proposals/"+slug(key)+".json").then(r=>r.ok?r.json():[]).then(a=>{
+  fetch("proposals/"+slug(key)+".json"+VER).then(r=>r.ok?r.json():[]).then(a=>{
     LOADED[key]=a||[];delete LOADING[key];rebuildFlat();applyTransform();
   }).catch(()=>{LOADED[key]=[];delete LOADING[key];});
 }
@@ -384,17 +422,17 @@ function applyTransform(){
   cv.style.pointerEvents=showPts?"auto":"none";
   $("#reset").classList.toggle("show",T.k>1.02);
   $("#viewSub").textContent=(filters.type==="ALL"?"All clearances":filters.type)+" · "+
-    (filters.year==="ALL"?"2023–2026":filters.year)+" · "+(showPts?"showing projects":"scroll to zoom in");
+    (filters.year==="ALL"?YRANGE:filters.year)+" · "+(showPts?"showing projects":"scroll to zoom in");
   drawLegend(showPts);
 }
 function updateKPIs(){
   const feats=STATES.features;
   const total=feats.reduce((s,f)=>s+countFor(f.properties.key),0);
   $("#kpiTotal").textContent=fmtNum(total);
-  $("#scopechip").textContent=(filters.year==="ALL"?"2023–26":filters.year);
+  $("#scopechip").textContent=(filters.year==="ALL"?YRANGE_SHORT:filters.year);
   $("#emptyMsg").style.display=total===0?"block":"none";
   if(total===0)$("#emptyMsg").textContent="No granted proposals for "+
-    (filters.type==="ALL"?"any type":filters.type)+", "+(filters.year==="ALL"?"2023–2026":filters.year)+".";
+    (filters.type==="ALL"?"any type":filters.type)+", "+(filters.year==="ALL"?YRANGE:filters.year)+".";
 }
 
 /* ---------- legend ---------- */
@@ -422,7 +460,7 @@ function drawLegend(showPts){
 /* ---------- tooltips ---------- */
 function posTip(e){const r=$("#mapwrap").getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;
   tip.style.left=Math.min(x+14,W-tip.offsetWidth-8)+"px";tip.style.top=Math.max(y-10,6)+"px";}
-function showStateTip(e,name,c){tip.innerHTML=`<div class="t">${name}</div><span class="k">${filters.type==="ALL"?"All clearances":filters.type}, ${filters.year==="ALL"?"2023–2026":filters.year}</span><br><b>${fmtNum(c)}</b> granted`;
+function showStateTip(e,name,c){tip.innerHTML=`<div class="t">${name}</div><span class="k">${filters.type==="ALL"?"All clearances":filters.type}, ${filters.year==="ALL"?YRANGE:filters.year}</span><br><b>${fmtNum(c)}</b> granted`;
   posTip(e);tip.classList.add("show");}
 function hideTip(){tip.classList.remove("show");}
 function cardHTML(rec){const t=rec[2],area=rec[4],nm=rec[5],cat=rec[6],pno=rec[7],gd=rec[8];

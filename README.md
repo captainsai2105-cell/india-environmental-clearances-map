@@ -11,7 +11,14 @@ clearance in India, built from the Government of India's **PARIVESH 2.0** open d
 
 ## What it shows
 
-- **50,185 granted clearances (2023–2026)** — EC 42,242 · FC (Stage-II) 7,517 · CRZ 426.
+- **43,689 unique clearances granted (2023–2026)** — EC 35,645 · FC (Stage-II) 7,609 · CRZ 435.
+  Excludes 7,185 subsequent actions on clearances that already exist — transfers,
+  amendments, validity extensions, corrigenda, splittings and surrenders. Those are
+  published separately under `map_v1/proposals_excluded/`, so the figure reconciles:
+  43,689 shown + 7,185 excluded = every granted-status record in PARIVESH 2.0.
+  *(Earlier versions of this README quoted 50,185, which counted both together. The
+  distinction follows MoEFCC's own dashboard, which reports "EC" and "EC Transfer" as
+  separate figures rather than adding them.)*
 - **Hero:** India choropleth of granted proposals per state/UT.
 - **Drill:** scroll/drag to zoom (QGIS-style); individual projects appear as you zoom in.
 - **Filter:** by clearance type (All / EC / FC / CRZ) and year (2023–2026).
@@ -38,7 +45,9 @@ search or click a state to isolate and zoom to it, then click any project for it
 
 ## Important caveats (please read before drawing conclusions)
 
-- **Snapshot, not live** — data as of **8 Aug 2026**; the portal updates daily.
+- **Refreshed weekly, not live** — a scheduled job reconciles the map against
+  PARIVESH every Sunday night; the portal itself updates daily. The map header
+  carries the date of the data it is actually showing.
 - **Overlap with a protected area is _not_ a violation**, and **a granted clearance is _not_
   wrongdoing.** This is a transparency/accessibility tool, not an accusation.
 - **Wildlife (WL) clearances are excluded** — the public data offers no clean approve/reject

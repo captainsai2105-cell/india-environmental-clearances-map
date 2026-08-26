@@ -7,6 +7,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Called directly by update-data.yml. A push made with GITHUB_TOKEN does not
+  # fire `on: push` workflows (GitHub's recursion guard), so the scheduled data
+  # update has to invoke this deploy itself rather than rely on its own commit.
+  workflow_call:
 
 permissions:
   contents: read

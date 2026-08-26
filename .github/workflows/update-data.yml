@@ -1,0 +1,118 @@
+name: Weekly data update
+
+# Refreshes map_v1/ from PARIVESH and redeploys the map.
+#
+# Sunday 20:30 UTC = Monday 02:00 IST, off-peak for the government server.
+# One run is ~45 HTTP requests to the GIS server (an attribute-only census of
+# EC/FC/CRZ, plus geometry for the week's new grants) and a few hundred single
+# lookups to the portal for proponent names, all rate-limited to 1/second.
+#
+# Cadence is deliberately weekly, not daily: the census cost is the same either
+# way, and roughly 300 new grants a week does not warrant seven times the load
+# on someone else's infrastructure.
+
+on:
+  schedule:
+    - cron: "30 20 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Report the diff without committing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Never let two updates write the store at once, and never cancel one midway:
+# the updater is atomic per run, but a cancelled push is not worth the risk.
+concurrency:
+  group: data-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    outputs:
+      committed: ${{ steps.commit.outputs.committed }}
+      summary: ${{ steps.update.outputs.summary }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # geopandas/fiona are only needed to rebuild state boundaries, which this
+      # job never does -- boundaries are static. The incremental path needs
+      # exactly these three, which keeps the install to a few seconds.
+      - name: Install dependencies
+        run: pip install shapely pyproj truststore
+
+      # TLS: bharatmapsparivesh serves only leaf + intermediate, so the chain
+      # terminates at a root the client must already trust. Windows AIA-chases
+      # for the missing link; OpenSSL does not, so this depends on the runner's
+      # ca-certificates carrying that root. If a run ever dies with
+      # CERTIFICATE_VERIFY_FAILED, commit the root to pipeline/certs/ and add
+      # `--cafile pipeline/certs/parivesh-chain.pem` below. Never --insecure.
+      - name: Refresh from PARIVESH
+        id: update
+        run: |
+          python pipeline/update_map_data.py ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Commit
+        id: commit
+        if: ${{ !inputs.dry_run }}
+        run: |
+          # --porcelain, not `git diff`: on the first run data_meta.json is a new
+          # untracked file, which git diff does not report.
+          if [ -z "$(git status --porcelain -- map_v1)" ]; then
+            echo "no change to commit"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add map_v1
+          git commit -m "Data: ${{ steps.update.outputs.summary }}"
+          git push
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+  # A reusable-workflow call, not a second deploy definition: the site is built
+  # in exactly one place, whether the trigger is a human push or this schedule.
+  deploy:
+    needs: update
+    if: needs.update.outputs.committed == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-pages.yml
+
+  # Without this the failure mode is silence: the map simply stops moving and
+  # nobody notices for a month.
+  notify:
+    needs: [update, deploy]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "Weekly data update failed on $(date -u +%Y-%m-%d)" \
+            --body "The scheduled PARIVESH refresh failed.
+
+          Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
+
+          The updater aborts rather than writing when a census comes back short,
+          when additions exceed --max-new, or when the upstream granted total
+          drops more than 2% below the stored one. Check which guard tripped
+          before re-running: a genuine upstream change needs the thresholds
+          reconsidered, not raised."

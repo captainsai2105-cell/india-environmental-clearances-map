@@ -1,6 +1,8 @@
-import json, os, re, collections
+import json, os, re, sys, collections
 from shapely.geometry import shape
 from pyproj import Geod
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import form_class   # form_type -> GRANT / ADMIN / UNKNOWN; see that file for why
 
 # Run from repo root. ROOT = raw GeoJSONL layers (produced by parivesh_pull.py).
 ROOT = "out"
@@ -30,7 +32,9 @@ CFG = [
 ]
 TNAME = {0:"EC",1:"FC",2:"CRZ"}
 counts = collections.defaultdict(lambda: {"EC":collections.Counter(),"FC":collections.Counter(),"CRZ":collections.Counter()})
-proposals = collections.defaultdict(list)   # key -> list of records
+proposals = collections.defaultdict(list)   # key -> records shown on the map
+excluded  = collections.defaultdict(list)   # key -> administrative actions
+unknown_forms = collections.Counter()
 unmatched = collections.Counter()
 grand = collections.Counter()
 
@@ -58,12 +62,23 @@ for name, tidx, gset, dfields in CFG:
             a_m2,_=GEOD.geometry_area_perimeter(geom); area_ha=round(abs(a_m2)/10000,2)
         except Exception:
             continue
-        kept+=1; grand[TNAME[tidx]]+=1
-        counts[key][TNAME[tidx]][y]+=1
         nm=(pr.get("proposal_name") or "").strip()[:120]
         cat=(pr.get("category") or pr.get("form_type") or "").strip()[:60]
         # record: [lon,lat,typeIdx,year,area_ha,name,category,proposalNo,grantDate]
-        proposals[key].append([lon,lat,tidx,y,area_ha,nm,cat,pr.get("proposal_no"),gdate])
+        rec=[lon,lat,tidx,y,area_ha,nm,cat,pr.get("proposal_no"),gdate]
+        # Status alone over-counts: transfers, amendments, extensions,
+        # corrigenda, splittings and surrenders all carry a granted status but
+        # are actions on a clearance that already exists -- and their date is
+        # the date of that action, not of the clearance.
+        bucket=form_class.classify(pr.get("form_type"))
+        if bucket==form_class.UNKNOWN:
+            unknown_forms[pr.get("form_type") or "(empty)"]+=1
+            continue
+        if bucket==form_class.ADMIN:
+            excluded[key].append(rec); continue
+        kept+=1; grand[TNAME[tidx]]+=1
+        counts[key][TNAME[tidx]][y]+=1
+        proposals[key].append(rec)
         if kept%5000==0: print(f"  {name}: kept {kept:,}/{n:,}", flush=True)
     print(f"{name}: total lines {n:,}, granted+dated+mapped {kept:,}")
 
@@ -77,10 +92,16 @@ for key,disp in KEYS.items():
     sc[key]={"name":disp,"counts":byt,"total":tot}
 json.dump(sc, open(os.path.join(OUT,"state_counts.json"),"w",encoding="utf-8"), ensure_ascii=False, separators=(",",":"))
 json.dump(proposals, open(os.path.join(OUT,"proposals.json"),"w",encoding="utf-8"), ensure_ascii=False, separators=(",",":"))
+json.dump(excluded, open(os.path.join(OUT,"proposals_excluded.json"),"w",encoding="utf-8"), ensure_ascii=False, separators=(",",":"))
 
 print("\n=== SUMMARY ===")
 print("grand totals:", dict(grand), "sum", sum(grand.values()))
 print("proposals written:", sum(len(v) for v in proposals.values()))
 print("state_counts states:", len(sc))
 print("unmatched stnames (dropped):", dict(unmatched))
+print("excluded (administrative actions):", sum(len(v) for v in excluded.values()))
+if unknown_forms:
+    print("!!! UNRECOGNISED form_type -- neither shown nor excluded; add them to "
+          "pipeline/form_class.py:")
+    for k,v in unknown_forms.most_common(): print(f"      {v:>6}  {k}")
 print("proposals.json size MB:", round(os.path.getsize(os.path.join(OUT,'proposals.json'))/1e6,2))

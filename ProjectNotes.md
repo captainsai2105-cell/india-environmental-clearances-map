@@ -14,7 +14,7 @@ and coastal (CRZ) clearance, but the data is fragmented across an undocumented G
 server, a metadata REST API, and thousands of committee-minutes PDFs — and is
 effectively unexplorable by the public. This project builds an end-to-end, reproducible
 pipeline that ingests **67,633 project boundaries** from PARIVESH 2.0, isolates the
-**50,185 granted** proposals (EC + FC + CRZ), derives their areas and locations,
+**43,689 uniquely granted** proposals (EC + FC + CRZ), derives their areas and locations,
 enriches them with proponent names, and renders them as a **self-contained interactive
 map of India** (state choropleth → zoom/pan → per-project detail). The larger
 contribution is methodological: a documented account of how noisy, semantically
@@ -82,15 +82,30 @@ streaming to newline-delimited GeoJSON. Notable obstacles solved:
 Filtered on the **`status_clean` text field** (never the `is_*_granted` booleans, which
 are unreliable — see §6):
 
-| Type | "Granted" = | Count | Grant-date field |
-|---|---|---|---|
-| EC  | "EC Granted", "Granted" | 42,242 | `granted_date` (ISO) |
-| FC  | "Stage-II Accorded", "GRANTED" (**Stage-I excluded**) | 7,517 | `date_of_stage_ii_approval` (DD-MON-YYYY) |
-| CRZ | "CRZ Granted" | 426 | `granted_date` (ISO) |
-| WL  | *excluded* | — | all 609 are "DISPOSED" |
+| Type | "Granted" = | Shown | Excluded | Grant-date field |
+|---|---|---|---|---|
+| EC  | "EC Granted", "Granted" | 35,645 | 7,125 | `granted_date` (ISO) |
+| FC  | "Stage-II Accorded", "GRANTED" (**Stage-I excluded**) | 7,609 | 53 | `date_of_stage_ii_approval` (DD-MON-YYYY) |
+| CRZ | "CRZ Granted" | 435 | 7 | `granted_date` (ISO) |
+| WL  | *excluded* | — | — | all 609 are "DISPOSED" |
+
+Status alone is not sufficient. A transfer, amendment, validity extension, corrigendum,
+splitting or surrender all carry a granted status, but each is an action on a clearance
+that **already exists** — and each carries the date of that action, so counting them puts
+a 2019 clearance on the map as a 2024 grant. `pipeline/form_class.py` classifies every
+`form_type` and routes these to `map_v1/proposals_excluded/` instead of discarding them,
+so shown + excluded reconciles to every granted-status record.
+
+The categories are the ministry's own: its EC dashboard API returns `EC`, `EC Transfer`,
+`EC Amendment`, `EC Validity Extension`, `Corrigendum` … as separate counters. Our mapping
+of form strings onto them was verified against its published central-EC figures — 2023
+`EC` 201 vs 201 exact; Corrigendum, Validity Extension and Surrender exact for 2025. The
+grant-versus-administrative **grouping**, however, is our judgment; no ministry source
+draws that line.
 
 FC Stage-I is excluded because it is *in-principle / conditional*, not a completed
-clearance. **v1 granted universe ≈ 50,185.**
+clearance. **v1 granted universe = 43,689 unique clearances** (+7,185 administrative
+actions, excluded and published separately).
 
 ### 3.3 Derived attributes
 - **Area (hectares):** the `project_area` field is empty for EC/CRZ (populated only for
@@ -190,9 +205,9 @@ carried into `proposals.json` (~9.4 MB) + `company_by_pno.json` (~7.7 MB) +
 
 ## 4. What We Built (Results)
 
-An interactive, filterable map of **50,185 granted clearances** across 36 states/UTs:
+An interactive, filterable map of **43,689 unique granted clearances** across 36 states/UTs:
 - **Hero:** India choropleth, granted count per state (default view: 2026 · all types =
-  12,555; all years · all types = 50,185).
+  all years · all types = 43,689).
 - **Filters:** clearance type (All / EC / FC / CRZ) and year (2023–2026 + All, default 2026).
 - **Drill:** zoom/pan reveals individual projects; hover shows full attributes.
 - **Data files:** `states.geojson`, `state_counts.json`, `proposals.json` (grouped by
@@ -227,7 +242,8 @@ Shipped after the first build; all live.
   when opened/zoomed. The old ~17 MB upfront load (proposals + company) is gone. New
   pipeline step: `pipeline/split_states.py`.
 
-**Default view:** All clearance types + All years (2023–2026) = **50,184** mapped.
+**Default view:** All clearance types + All years (2023–2026) = **43,689** mapped
+(+7,185 administrative actions excluded and published separately).
 
 ---
 
@@ -239,12 +255,13 @@ introduced with 2.0 works. Spatial control confirms the pipeline: **wildlife pro
 overlap protected areas 574/609 = 94.25 %**, which is what the law predicts.
 
 ### 5.2 Boundary count vs granted count — full reconciliation
-The gap between 67,633 boundaries and 50,185 granted is **not "rejected."** Computed from
+The gap between 67,633 boundaries and the granted count is **not "rejected."** Computed from
 all five layers:
 
 | Category | Count | Layer | Note |
 |---|---|---|---|
-| **GRANTED (v1)** | **50,185** | EC/FC/CRZ | EC 42,242 · FC 7,517 · CRZ 426 |
+| **GRANTED, unique (v1.3)** | **43,689** | EC/FC/CRZ | EC 35,645 · FC 7,609 · CRZ 435 |
+| Actions on existing clearances | 7,185 | EC/FC/CRZ | transfers, amendments, extensions, corrigenda, splittings, surrenders — **not new clearances** |
 | ToR stage | 10,990 | EC | scope approved, EC **not yet decided** |
 | In process (pending) | 2,592 | mostly FC | levies / DFO / EDS states |
 | Forest Land Bank | 2,548 | — | **not a clearance** — afforestation land inventory |
@@ -337,9 +354,15 @@ bug. Both were caught by a human asking "are we sure?", not by better prompting.
    attribute sources, and report the infrastructure defects to the ministry first.
 2. **PMTiles** — convert proposals to vector tiles so the browser loads only what's in
    view; prerequisite for public scale and for auto-updating growing data.
-3. **Auto-update** — a scheduled (weekly, not daily) job doing an **incremental** GIS pull
-   (records with `granted_date` after last run) + incremental enrichment; keep large data
-   out of git history; be a polite scraper.
+3. ~~**Auto-update**~~ — **done.** A weekly GitHub Actions job reconciles the map against
+   PARIVESH and redeploys. The `granted_date`-after-last-run design sketched here does not
+   survive contact with the layers: every `KML_Edit` field is `esriFieldTypeString`, FC's
+   Stage-II date is `DD-MON-YYYY` and does not sort, and `sync_date` marks the KML push
+   rather than the decision — 98.8% of FC Stage-II approvals carry a `sync_date` earlier
+   than their own approval date. What works instead is an **attribute census and diff**:
+   sweep each layer without geometry (2000 rows in ~1.4 s), compare against the published
+   per-state files, and fetch geometry only for genuinely new proposals. Every run is then
+   a full reconciliation rather than a watermark that can silently fall behind.
 4. **WL v2** — parse NBWL/SBWL minutes for the Recommended/Not-Recommended decision, giving
    a rare *granted-and-rejected* view.
 5. **Legacy history** — ingest and clean the 1.0 layers to extend coverage back to 2006

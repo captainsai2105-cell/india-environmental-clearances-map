@@ -40,6 +40,7 @@ Usage
     python parivesh_pull.py
     python parivesh_pull.py --sensitivity
     python parivesh_pull.py --include-legacy --resume
+    python parivesh_pull.py --incremental          # top up an existing out/
 """
 
 from __future__ import annotations
@@ -244,6 +245,39 @@ class Client:
                               f"{'; '.join(e.get('details') or [])}")
         return d
 
+    def census(self, svc, lid, fields, page=PAGE):
+        """Attribute-only sweep of an entire layer. Yields attribute dicts.
+
+        Geometry is what makes a full pull expensive: FC's patch polygons run
+        to hundreds of MB and time out at page 2000. Drop the geometry and the
+        same 2000 rows come back in ~500 KB in ~1.3 s. So the cheap way to
+        learn what moved upstream is to census the attributes every run and
+        fetch geometry only for the rows that actually changed.
+
+        Ordered by objectid: without an explicit sort, deep offsets are not
+        guaranteed stable between pages, and rows can be seen twice or missed.
+        """
+        offset = 0
+        while True:
+            d = self.get(f"{BASE}/{svc}/MapServer/{lid}/query?"
+                         + urllib.parse.urlencode({
+                             "where": "1=1", "outFields": ",".join(fields),
+                             "returnGeometry": "false",
+                             "orderByFields": "objectid",
+                             "resultOffset": offset, "resultRecordCount": page,
+                             "f": "json"}))
+            if isinstance(d, dict) and "error" in d:
+                e = d["error"]
+                raise ArcGISError(f"code {e.get('code')}: {e.get('message')}")
+            feats = d.get("features") or []
+            if not feats:
+                return
+            for f in feats:
+                yield f.get("attributes") or {}
+            if len(feats) < page:
+                return
+            offset += len(feats)
+
 
 # --------------------------------------------------------------------------- #
 # cleaning
@@ -427,6 +461,92 @@ def pull_layer(cli: Client, svc: str, lid: int, name: str, resume: bool) -> dict
             "file": path, "pulled_at": datetime.now(timezone.utc).isoformat()}
 
 
+def existing_objectids(path: str) -> set:
+    """objectids already on disk.
+
+    Regex rather than json.loads: ec_proposals.geojsonl is 269 MB and FC is
+    549 MB. Parsing every line to read one integer costs minutes; scanning
+    for the key costs seconds.
+    """
+    ids = set()
+    if not os.path.exists(path):
+        return ids
+    pat = re.compile(rb'"objectid":\s*(\d+)')
+    with open(path, "rb") as fh:
+        for line in fh:
+            m = pat.search(line)
+            if m:
+                ids.add(int(m.group(1)))
+    return ids
+
+
+def incremental_layer(cli: Client, svc: str, lid: int, name: str) -> dict:
+    """Append only the rows that appeared upstream since the last pull.
+
+    Census the layer's objectids (cheap -- no geometry), subtract what is
+    already on disk, and fetch geometry for the remainder. A weekly delta on
+    EC is ~270 rows against a 54,000-row layer, so this is roughly three
+    orders of magnitude less traffic than re-pulling everything.
+
+    APPEND-ONLY, on purpose. Rows withdrawn upstream stay in the file rather
+    than being silently dropped -- the count of vanished objectids is reported
+    instead, so you can decide when a clean re-pull is warranted. Existing rows
+    are also not re-fetched, so an edited geometry is not picked up here.
+    """
+    path = os.path.join(OUT, f"{name}.geojsonl")
+    total = cli.count(svc, lid)
+    have = existing_objectids(path)
+    print(f"    {total:,} upstream, {len(have):,} on disk")
+
+    live = {a["objectid"] for a in cli.census(svc, lid, ["objectid"])}
+    if len(live) < total * 0.99:
+        raise RuntimeError(f"census returned {len(live):,} of {total:,} objectids "
+                           f"-- incomplete, refusing to treat the rest as absent")
+    missing = sorted(live - have)
+    vanished = len(have - live)
+    print(f"    {len(missing):,} new, {vanished:,} vanished upstream (kept on disk)")
+    if not missing:
+        return {"service": svc, "layer_id": lid, "name": name, "expected": total,
+                "written": len(have), "flags": {"empty": 0, "outside": 0, "torn": 0},
+                "mode": "incremental", "added": 0, "vanished": vanished,
+                "file": path, "pulled_at": datetime.now(timezone.utc).isoformat()}
+
+    # FC polygons are vertex-heavy; ask for fewer per request than elsewhere.
+    batch = 50 if (svc, lid) in PAGE_OVERRIDE else ID_BATCH
+    flags = {"empty": 0, "outside": 0, "torn": 0}
+    added = 0
+    with open(path, "a", encoding="utf-8") as fh:
+        i = 0
+        while i < len(missing):
+            chunk = missing[i:i + batch]
+            try:
+                d = cli.by_ids(svc, lid, chunk)
+            except (OversizeResponse, ArcGISError, RuntimeError) as e:
+                if batch <= 10:
+                    raise RuntimeError(f"failing at batch size {batch}: {e}") from e
+                batch = max(10, batch // 2)
+                print(f"      batch too large ({e}) -> {batch}")
+                continue
+            for f in d.get("features") or []:
+                f = annotate(f, name)
+                p = f["properties"]
+                flags["empty"] += bool(p.get("flag_empty_geometry"))
+                flags["outside"] += bool(p.get("flag_outside_india"))
+                flags["torn"] += bool(p.get("flag_torn_geometry"))
+                fh.write(json.dumps(f, ensure_ascii=False) + "\n")
+                added += 1
+            i += len(chunk)
+            fh.flush()
+            print(f"      {i:,}/{len(missing):,}", end="\r", flush=True)
+
+    print(f"      +{added:,} rows appended"
+          f"   [empty {flags['empty']}, outside {flags['outside']}, torn {flags['torn']}]")
+    return {"service": svc, "layer_id": lid, "name": name, "expected": total,
+            "written": len(have) + added, "flags": flags, "mode": "incremental",
+            "added": added, "vanished": vanished, "file": path,
+            "pulled_at": datetime.now(timezone.utc).isoformat()}
+
+
 def to_parquet(name: str) -> str | None:
     try:
         import geopandas as gpd  # noqa: PLC0415
@@ -452,6 +572,9 @@ def main() -> None:
                     help="also pull Parivesh 1.0 (patch-level, known defects)")
     ap.add_argument("--only", nargs="*", help="restrict to these output names")
     ap.add_argument("--resume", action="store_true")
+    ap.add_argument("--incremental", action="store_true",
+                    help="append only rows new since the last pull (census the "
+                         "objectids, fetch geometry for the difference)")
     ap.add_argument("--delay", type=float, default=1.0)
     ap.add_argument("--cafile")
     ap.add_argument("--insecure", action="store_true")
@@ -498,13 +621,16 @@ def main() -> None:
 
     done = {l["name"] for l in manifest["layers"]}
     for svc, lid, name in layers:
-        if name in done and args.resume and not os.path.exists(
-                os.path.join(OUT, f"{name}.offset")):
+        if (name in done and args.resume and not args.incremental
+                and not os.path.exists(os.path.join(OUT, f"{name}.offset"))):
             print(f"  [skip] {name}")
             continue
         print(f"  {svc}/{lid} -> {name}")
         try:
-            rec = pull_layer(cli, svc, lid, name, args.resume)
+            if args.incremental:
+                rec = incremental_layer(cli, svc, lid, name)
+            else:
+                rec = pull_layer(cli, svc, lid, name, args.resume)
         except Exception as e:  # noqa: BLE001
             print(f"    FAILED: {e}")
             continue
