@@ -3,7 +3,7 @@
 An interactive map of every **granted** environmental (EC), forest (FC), and coastal (CRZ)
 clearance in India, built from the Government of India's **PARIVESH 2.0** open data.
 
-![Interactive map of India's granted environmental clearances, 2023–2026](map_v1/Map_Preview_v1.png)
+![Interactive map of India's granted environmental clearances, 2023–2026](map_v1/Map_Preview.png)
 
 **Live demo:** https://captainsai2105-cell.github.io/india-environmental-clearances-map/ · **Method & write-up:** [ProjectNotes.md](ProjectNotes.md)
 
