@@ -471,12 +471,19 @@ function posTip(e){const r=$("#mapwrap").getBoundingClientRect();const x=e.clien
 function showStateTip(e,name,c){tip.innerHTML=`<div class="t">${name}</div><span class="k">${filters.type==="ALL"?"All clearances":filters.type}, ${filters.year==="ALL"?YRANGE:filters.year}</span><br><b>${fmtNum(c)}</b> granted`;
   posTip(e);tip.classList.add("show");}
 function hideTip(){tip.classList.remove("show");}
-function cardHTML(rec){const t=rec[2],area=rec[4],nm=rec[5],cat=rec[6],pno=rec[7],gd=rec[8];
+/* Area is deliberately NOT shown. It is still carried in the data at index 4,
+   derived from the submitted boundary, but it does not mean one consistent
+   thing: for ~10% of EC and ~25% of CRZ records the polygon is under 0.01 ha
+   and is not a real footprint, some records carry district-sized boundaries,
+   and where PARIVESH states its own figure (FC only) ours exceeds it by more
+   than 2x about a third of the time — the boundary submitted and the land
+   actually cleared are not the same quantity. Showing one number labelled
+   "Area" would imply a precision the source does not support. */
+function cardHTML(rec){const t=rec[2],nm=rec[5],cat=rec[6],gd=rec[8];
   return `<span class="badge" style="background:${TYPE_COLORS[t]}">${TYPES[t]}</span>`+
     `<div class="t">${nm||"(unnamed project)"}</div>`+
     `<span class="k">Type</span> ${cat||"—"}<br>`+
     `<span class="k">Company</span> ${rec[9]||"—"}<br>`+
-    `<span class="k">Area</span> ${area?fmtNum(area)+" ha":"—"}<br>`+
     `<span class="k">Granted</span> ${fmtDate(gd)}`;}
 function placeCardBeside(px,py){tip.classList.add("show");
   const cw=tip.offsetWidth,ch=tip.offsetHeight;

@@ -31,7 +31,7 @@ clearance in India, built from the Government of India's **PARIVESH 2.0** open d
 - **Hero:** India choropleth of granted proposals per state/UT.
 - **Drill:** scroll/drag to zoom (QGIS-style); individual projects appear as you zoom in.
 - **Filter:** by clearance type (All / EC / FC / CRZ) and year (2023–2026).
-- **Hover a project** for its name, type, area (hectares), grant date, and proponent.
+- **Hover a project** for its name, type, grant date, and proponent.
 
 ## Run locally
 
