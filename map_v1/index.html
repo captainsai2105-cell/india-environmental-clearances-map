@@ -203,6 +203,8 @@
       Boundaries © DataMeet / LGD / Survey of India (CC-BY-4.0). Clearance data:
       Government of India, PARIVESH 2.0. Snapshot <span id="asofFoot">8 Aug 2026</span>; updated weekly; the live portal grows daily.
       Granted proposals only (FC Stage-II; WL excluded).
+      <a href="https://github.com/captainsai2105-cell/india-environmental-clearances-map"
+         target="_blank" rel="noopener">Source code &amp; data</a>.
     </footer>
   </div>
 </div>
@@ -223,6 +225,7 @@ const svg=$("#map"),cv=$("#pts"),ctx=cv.getContext("2d"),tip=$("#tip"),NS="http:
 let vp=null,lbl=null,mk=null;
 
 /* ---------- load ---------- */
+const REPO="https://github.com/captainsai2105-cell/india-environmental-clearances-map";
 let VER="";                         // data version: cache-buster for the per-state files
 async function boot(){
   // data_meta.json is rewritten by every scheduled update, so the snapshot date
@@ -242,7 +245,12 @@ async function boot(){
         fmtNum(ex.total)+" subsequent actions on clearances that already exist — transfers, "+
         "amendments, validity extensions, corrigenda, splittings and surrenders. Most relate to "+
         "clearances granted before PARIVESH 2.0 began in Sept 2022, which this dataset does not "+
-        "cover. Those records are published at <code>proposals_excluded/</code>.";
+        // A real link, not a bare path: appending proposals_excluded/ to this site's URL
+        // 404s, because Pages serves no directory listing. The repo folder is the only
+        // route a reader can actually follow, and a claim you cannot check is worse than
+        // no claim at all.
+        "cover. <a href=\""+REPO+"/tree/main/map_v1/proposals_excluded\" target=\"_blank\" "+
+        "rel=\"noopener\">Those records are published here</a>, one file per state.";
     }
   }
   [STATES,COUNTS]=await Promise.all([
