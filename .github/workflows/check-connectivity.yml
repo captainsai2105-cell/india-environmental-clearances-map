@@ -1,0 +1,33 @@
+name: Check PARIVESH connectivity
+
+# Answers one question in under a minute: can a GitHub runner reach the PARIVESH
+# hosts right now, and how fast?
+#
+# Worth having because the two explanations for a stale map look identical from
+# the outside -- our code broke, or the government server will not talk to
+# GitHub today -- and telling them apart otherwise means triggering a
+# 30-minute update and reading the log.
+#
+# Manual only. No schedule: this is a diagnostic, not a monitor, and it should
+# not add traffic to someone else's infrastructure on a timer.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # No shapely/pyproj needed: this only makes HTTP calls.
+      - name: Probe both hosts
+        run: python -u pipeline/check_connectivity.py --names 5
