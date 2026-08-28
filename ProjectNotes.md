@@ -81,9 +81,14 @@ point.
 ### 3.1 Ingestion (GIS)
 Pulled the five 2.0 proposal layers from the ArcGIS `KML_Edit` MapServer (`outSR=4326`),
 streaming to newline-delimited GeoJSON. Notable obstacles solved:
-- **Broken TLS chain** — the server omits its intermediate CA; browsers compensate via
-  AIA-chasing, OpenSSL-based tools fail with `CERTIFICATE_VERIFY_FAILED`. Fixed with
-  Python `truststore`.
+- **Broken TLS chain** — the GIS host serves its leaf certificate and the Let's Encrypt
+  intermediate and then stops, at a root the client is expected to already trust. Browsers
+  and Windows compensate by fetching the missing link (AIA-chasing); OpenSSL does not, and
+  fails with `CERTIFICATE_VERIFY_FAILED`. `truststore` fixes it on Windows and macOS but
+  **not on Linux**, where it defers to the same OS bundle — this killed the first CI run.
+  The missing root now ships in `pipeline/certs/isrg-root-yr.pem` and is *added to* (never
+  substituted for) the system trust store. Notably the portal host serves a complete
+  three-certificate chain, so only the GIS host is affected.
 - **Four coordinate systems** across services (3857 / 4326 / 32643 / 3395) — normalised
   by always requesting `outSR=4326`.
 - **ArcGIS returns errors as HTTP 200 with an `error` key** — must be checked, or a failed
@@ -134,6 +139,13 @@ API (`nameOfUserAgency`). Rather than ~50k per-proposal calls, we used the bulk
 `advanceSearchData?majorClearanceType={1,2,4}&state=<census code>` endpoint (~144 calls,
 one per type × state), yielding **146,904 `proposalNo` → company mappings**, joined to
 the proposals by proposal number.
+
+For the *weekly* refresh the bulk endpoint is the wrong tool — 13 MB per state to learn a
+few hundred names. The updater instead calls `dataOfProposalNo` once per new proposal
+(~0.3 s locally, ~1.4 s from a CI runner). That phase is deliberately time-boxed and fails
+open: names are a convenience, the geometry and counts are the product, so a slow portal
+leaves some names blank for the following week rather than costing the run. Records
+without a name are retried automatically.
 
 ### 3.5 Boundary preparation
 DataMeet `Admin2` shapefile (36 states/UTs, EPSG:4326) → simplified geometry, normalised
@@ -455,7 +467,8 @@ https://github.com/yashveeeeeeer/india-geodata  ->  data/administrative/states/d
 
 | Layer | Tools |
 |---|---|
-| Ingestion / networking | Python 3.13, `urllib`, **`truststore`** (TLS chain), `json` |
+| Ingestion / networking | Python 3.13, `urllib`, `json`; TLS via the system trust store plus a bundled ISRG root (`truststore` alone is insufficient on Linux) |
+| Automation | GitHub Actions — weekly reconciliation, Pages deploy, connectivity probe |
 | Geoprocessing | `shapely` (geometry/centroids), **`pyproj.Geod`** (ellipsoidal area), `geopandas` + `fiona` (shapefile) |
 | Frontend | Single self-contained HTML; **vanilla JS**; inline **SVG** (states) + **Canvas** (points); custom Mercator projection + zoom/pan transform; **no external libraries** |
 | Serving | `python -m http.server` (static) |
@@ -475,7 +488,14 @@ https://github.com/yashveeeeeeer/india-geodata  ->  data/administrative/states/d
 | `prep_proposals.py` | Filter granted; derive centroid + area; per-state counts + proposals |
 | `enrich_companies.py` | Path-B proponent enrichment (checkpointed) |
 | `rebuild_manifest.py` | Rebuild the data manifest offline from on-disk layers |
+| `form_class.py` | `form_type` → GRANT / ADMIN / UNKNOWN; the one table both the cold build and the weekly updater import, so they cannot drift |
+| `update_map_data.py` | **Weekly refresh**: attribute census → diff → geometry for the delta → merge into both stores |
+| `check_connectivity.py` | Times both PARIVESH hosts in under a minute; separates "our code broke" from "the server won't answer today" |
 | `map_v1/index.html` | The interactive map |
+
+Automation lives in `.github/workflows/`: `update-data.yml` (weekly cron → commit → deploy),
+`deploy-pages.yml` (publishes `map_v1/`, also callable), `check-connectivity.yml` (manual
+diagnostic).
 
 ---
 

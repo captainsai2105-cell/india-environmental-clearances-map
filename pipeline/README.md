@@ -2,6 +2,12 @@
 
 Reproduces the map's data files from source. Run all commands **from the repo root**.
 Requires Python 3.13 with `shapely`, `pyproj`, `geopandas`, `fiona`, and `truststore`.
+(The weekly refresh needs only the first two plus `truststore` — see below.)
+
+**TLS:** the GIS host serves an incomplete chain. `truststore` covers Windows and macOS;
+on Linux it defers to the OS bundle and does *not* help, so the missing root ships in
+`certs/isrg-root-yr.pem` and is added to the system trust store automatically. Nothing to
+configure — but never reach for `--insecure`.
 
 Full context, endpoints, and query parameters are in [`../ProjectNotes.md`](../ProjectNotes.md)
 (Appendices A & D).
@@ -10,8 +16,7 @@ Full context, endpoints, and query parameters are in [`../ProjectNotes.md`](../P
 
 1. **Ingest the GIS layers** → `out/*.geojsonl`
    Use the repo's ingestion scripts (`../parivesh_pull.py`) to pull the PARIVESH 2.0
-   `KML_Edit` layers (EC/FC/WL/CRZ) + Forest Land Bank. `truststore` is required for the
-   server's incomplete TLS chain.
+   `KML_Edit` layers (EC/FC/WL/CRZ) + Forest Land Bank. See the TLS note above.
 
 2. **Fetch state boundaries** → `boundaries/Admin2.*`
    Download the DataMeet Admin2 shapefile (states, EPSG:4326, CC-BY-4.0) from
@@ -38,6 +43,8 @@ Full context, endpoints, and query parameters are in [`../ProjectNotes.md`](../P
    as index 9**. The map lazy-loads the first set per state (fast first paint); required
    for the live site. `company_by_pno.json` is no longer fetched by the map at runtime.
 
+Then serve the map: `python -m http.server 8137 --directory map_v1`.
+
 ## What counts as a clearance
 
 Filtering on status alone over-counts. `pipeline/form_class.py` classifies every
@@ -55,7 +62,6 @@ counted nor silently dropped. The updater reports it and aborts past a threshold
 `form_class.py` before changing any of it — it records which parts are the ministry's own
 categories and which are our judgment.
 
-Then serve the map: `python -m http.server 8137 --directory map_v1`.
 
 ## Keeping it current
 
@@ -93,3 +99,21 @@ pull, rather than re-downloading 951 MB):
 ```
 python parivesh_pull.py --incremental
 ```
+
+## When something looks wrong
+
+```
+python pipeline/check_connectivity.py
+```
+
+Times both PARIVESH hosts — a count query per GIS layer, and real `dataOfProposalNo`
+lookups for records that currently have no proponent name. Under a minute, read-only.
+
+Run it **first** whenever the map looks stale. The two explanations — our code broke, or
+the government server will not answer today — are indistinguishable from the outside, and
+this separates them without triggering a 30-minute update. It reads the same locally as in
+CI, so the two can be compared directly; that matters, because the same GIS census has
+taken 109 s and 1,677 s from GitHub on the same day, against ~40 s locally every time.
+
+Also available as a manual GitHub Actions run (`check-connectivity.yml`). Exits non-zero
+only if a host is entirely unreachable, so the run's colour carries the answer.
