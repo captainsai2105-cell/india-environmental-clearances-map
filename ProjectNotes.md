@@ -289,8 +289,7 @@ separately under `map_v1/proposals_excluded/`.
 
 ### 5.1 PARIVESH 2.0 geometry is clean (the positive headline)
 **67,633 project boundaries, zero falling outside India.** The mandatory KML validation
-introduced with 2.0 works. Spatial control confirms the pipeline: **wildlife proposals
-overlap protected areas 574/609 = 94.25 %**, which is what the law predicts.
+introduced with 2.0 works.
 
 ### 5.2 Boundary count vs granted count — full reconciliation
 The gap between 67,633 boundaries and the granted count is **not "rejected."** Computed from
