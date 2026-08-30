@@ -1,17 +1,17 @@
 {
- "generated_at": "2026-08-28T09:14:53+00:00",
- "snapshot_label": "28 Aug 2026",
+ "generated_at": "2026-08-30T22:57:13+00:00",
+ "snapshot_label": "31 Aug 2026",
  "totals": {
-  "EC": 35839,
-  "FC": 7636,
+  "EC": 35841,
+  "FC": 7659,
   "CRZ": 442,
-  "all": 43917
+  "all": 43942
  },
  "excluded": {
-  "total": 7195,
+  "total": 7197,
   "by_category": {
    "EC Transfer": 3551,
-   "EC Amendment": 1325,
+   "EC Amendment": 1327,
    "EC Validity Extension": 1204,
    "Corrigendum": 657,
    "ToR Amendment": 319,
@@ -26,13 +26,13 @@
  },
  "upstream": {
   "EC": {
-   "layer_rows": 54749,
-   "granted_mapped": 35839,
-   "excluded": 7135
+   "layer_rows": 54756,
+   "granted_mapped": 35841,
+   "excluded": 7137
   },
   "FC": {
-   "layer_rows": 10416,
-   "granted_mapped": 7636,
+   "layer_rows": 10436,
+   "granted_mapped": 7659,
    "excluded": 53
   },
   "CRZ": {
@@ -42,9 +42,9 @@
   }
  },
  "last_change": {
-  "added": 117,
+  "added": 27,
   "withdrawn": 0,
-  "amended": 7,
+  "amended": 3,
   "reclassified": 0
  },
  "source": "PARIVESH 2.0 KML_Edit (EC/FC/CRZ), granted only"
