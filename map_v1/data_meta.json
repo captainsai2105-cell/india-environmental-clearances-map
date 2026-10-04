@@ -1,22 +1,22 @@
 {
- "generated_at": "2026-09-27T23:21:59+00:00",
- "snapshot_label": "28 Sep 2026",
+ "generated_at": "2026-10-04T23:24:54+00:00",
+ "snapshot_label": "5 Oct 2026",
  "totals": {
-  "EC": 36383,
-  "FC": 7933,
-  "CRZ": 453,
-  "all": 44769
+  "EC": 36544,
+  "FC": 7963,
+  "CRZ": 468,
+  "all": 44975
  },
  "excluded": {
-  "total": 7336,
+  "total": 7340,
   "by_category": {
-   "EC Transfer": 3604,
-   "EC Amendment": 1347,
-   "EC Validity Extension": 1234,
+   "EC Transfer": 3605,
+   "EC Amendment": 1348,
+   "EC Validity Extension": 1235,
    "Corrigendum": 678,
    "ToR Amendment": 329,
    "EC Surrender": 56,
-   "FC transfer": 37,
+   "FC transfer": 38,
    "EC Splitting": 24,
    "FC amendment": 19,
    "CRZ Amendment": 5,
@@ -26,25 +26,25 @@
  },
  "upstream": {
   "EC": {
-   "layer_rows": 55748,
-   "granted_mapped": 36383,
-   "excluded": 7273
+   "layer_rows": 55937,
+   "granted_mapped": 36544,
+   "excluded": 7276
   },
   "FC": {
-   "layer_rows": 10713,
-   "granted_mapped": 7933,
-   "excluded": 56
+   "layer_rows": 10748,
+   "granted_mapped": 7963,
+   "excluded": 57
   },
   "CRZ": {
-   "layer_rows": 462,
-   "granted_mapped": 453,
+   "layer_rows": 477,
+   "granted_mapped": 468,
    "excluded": 7
   }
  },
  "last_change": {
-  "added": 160,
+  "added": 210,
   "withdrawn": 0,
-  "amended": 48,
+  "amended": 14,
   "reclassified": 0
  },
  "source": "PARIVESH 2.0 KML_Edit (EC/FC/CRZ), granted only"
