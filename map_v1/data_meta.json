@@ -1,11 +1,11 @@
 {
- "generated_at": "2026-11-01T23:46:01+00:00",
- "snapshot_label": "2 Nov 2026",
+ "generated_at": "2026-11-08T23:54:32+00:00",
+ "snapshot_label": "9 Nov 2026",
  "totals": {
-  "EC": 37804,
-  "FC": 8207,
+  "EC": 38224,
+  "FC": 8336,
   "CRZ": 559,
-  "all": 46570
+  "all": 47119
  },
  "excluded": {
   "total": 7187,
@@ -26,13 +26,13 @@
  },
  "upstream": {
   "EC": {
-   "layer_rows": 56908,
-   "granted_mapped": 37804,
+   "layer_rows": 57328,
+   "granted_mapped": 38224,
    "excluded": 7120
   },
   "FC": {
-   "layer_rows": 11091,
-   "granted_mapped": 8207,
+   "layer_rows": 11299,
+   "granted_mapped": 8336,
    "excluded": 59
   },
   "CRZ": {
@@ -42,9 +42,9 @@
   }
  },
  "last_change": {
-  "added": 487,
-  "withdrawn": 0,
-  "amended": 17,
+  "added": 550,
+  "withdrawn": 1,
+  "amended": 34,
   "reclassified": 0
  },
  "source": "PARIVESH 2.0 KML_Edit (EC/FC/CRZ), granted only"
